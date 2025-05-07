@@ -5,7 +5,7 @@ from scipy.ndimage import gaussian_filter
 import random
 
 class WildfireSimulation:
-    def __init__(self, grid_size=25, max_iterations=5, convergence_threshold=0.0001):
+    def __init__(self, grid_size=25, max_iterations=5, convergence_threshold=0.0001, hypothesis_dense_shrub=False):
         self.grid_size = grid_size
         self.max_iterations = max_iterations
         self.convergence_threshold = convergence_threshold
@@ -13,7 +13,7 @@ class WildfireSimulation:
         
         # Load static features
         self.elevation = self.env.generate_elevation_grid()
-        self.vegetation = self.env.generate_vegetation_ignition_grid(density_factor=3)
+        self.vegetation = self.env.generate_vegetation_ignition_grid(density_factor=3,hypothesis_dense_shrub=hypothesis_dense_shrub)
         
         # Load ignition points (fire presence)
         self.ignition_points = np.load('fire_frequent_cells_25x25_southeast_us.npy')
@@ -247,7 +247,7 @@ final_burned_areas = []
 all_iterations = []
 
 for run in range(N_RUNS):
-    sim = WildfireSimulation()
+    sim = WildfireSimulation(hypothesis_dense_shrub=False)
     fire_grid, burned_areas = sim.simulate_spread()
     final_burned_areas.append(burned_areas[-1])
     all_iterations.append(len(burned_areas) - 1)  # -1 because burned_areas includes initial state

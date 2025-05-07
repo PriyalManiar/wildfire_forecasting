@@ -1,0 +1,232 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from environmental_factors import EnvironmentalFactors
+from scipy.ndimage import gaussian_filter
+import random
+
+class WildfireSimulation:
+    def __init__(self, grid_size=25, max_iterations=100, convergence_threshold=0.01):
+        self.grid_size = grid_size
+        self.max_iterations = max_iterations
+        self.convergence_threshold = convergence_threshold
+        self.env = EnvironmentalFactors(grid_size=grid_size)
+        
+        # Load static features
+        self.elevation = self.env.generate_elevation_grid()
+        self.vegetation = self.env.generate_vegetation_ignition_grid()
+        
+        # Load ignition points (fire presence)
+        self.ignition_points = np.load('fire_frequent_cells_25x25_southeast_us.npy')
+        
+        # Initialize fire spread grid
+        self.fire_grid = np.zeros((grid_size, grid_size))
+        self.burned_areas = []
+        
+        # Store environmental conditions for each iteration
+        self.environmental_history = []
+        
+    def sample_environmental_conditions(self):
+        """Sample new environmental conditions for the current iteration."""
+        quarter = random.choice(['Q1', 'Q2', 'Q3', 'Q4'])
+        humidity = self.env.generate_humidity_grid(quarter)
+        wind_speed, wind_direction = self.env.generate_wind_grids(quarter)
+        temperature = self.env.temperature_grid(quarter)
+        conditions = {
+            'humidity': humidity,
+            'wind_speed': wind_speed,
+            'wind_direction': wind_direction,
+            'temperature': temperature,
+            'quarter': quarter
+        }
+        self.environmental_history.append(conditions)
+        return conditions
+        
+    def calculate_spread_probability(self, i, j, conditions):
+        """Calculate probability of fire spread to a cell based on environmental factors."""
+        # Base probability from ignition points and vegetation
+        base_prob = self.ignition_points[i, j] * self.vegetation[i, j]
+        
+        # Temperature effect (higher temp = higher spread)
+        temp_effect = (conditions['temperature'][i, j] - np.min(conditions['temperature'])) / \
+                     (np.max(conditions['temperature']) - np.min(conditions['temperature']))
+        
+        # Humidity effect (lower humidity = higher spread)
+        humidity_effect = 1 - (conditions['humidity'][i, j] - np.min(conditions['humidity'])) / \
+                         (np.max(conditions['humidity']) - np.min(conditions['humidity']))
+        
+        # Wind effect (higher wind = higher spread)
+        wind_effect = (conditions['wind_speed'][i, j] - np.min(conditions['wind_speed'])) / \
+                     (np.max(conditions['wind_speed']) - np.min(conditions['wind_speed']))
+        
+        # Elevation effect (higher elevation = lower spread)
+        elevation_effect = 1 - (self.elevation[i, j] - np.min(self.elevation)) / \
+                          (np.max(self.elevation) - np.min(self.elevation))
+        
+        # Combine effects with tuned weights
+        weights = {
+            'base': 0.2,
+            'temperature': 0.1,
+            'humidity': 0.4,       # Stronger suppression
+            'wind': 0.2,
+            'elevation': 0.1
+        }
+        
+        spread_prob = (
+            weights['base'] * base_prob +
+            weights['temperature'] * temp_effect +
+            weights['humidity'] * humidity_effect +
+            weights['wind'] * wind_effect +
+            weights['elevation'] * elevation_effect
+        )
+        # Cap the maximum spread probability
+        spread_prob = min(spread_prob, 0.4)
+        return spread_prob
+    
+    def simulate_spread(self):
+        """Simulate wildfire spread until convergence or max iterations."""
+        # 0 = unburned, 1 = burning, 2 = burned out
+        self.fire_grid = self.ignition_points.copy()
+        self.burned_areas = [np.sum(self.fire_grid == 1)]
+        for iteration in range(self.max_iterations):
+            conditions = self.sample_environmental_conditions()
+            new_fire_grid = self.fire_grid.copy()
+            spread_probs = []
+            for i in range(self.grid_size):
+                for j in range(self.grid_size):
+                    if self.fire_grid[i, j] == 0:  # If cell is not burning or burned
+                        for di in [-1, 0, 1]:
+                            for dj in [-1, 0, 1]:
+                                ni, nj = i + di, j + dj
+                                if (0 <= ni < self.grid_size and 
+                                    0 <= nj < self.grid_size and 
+                                    self.fire_grid[ni, nj] == 1):  # If neighbor is burning
+                                    spread_prob = self.calculate_spread_probability(i, j, conditions)
+                                    if di != 0 or dj != 0:
+                                        wind_angle = np.arctan2(dj, di) * 180 / np.pi
+                                        wind_dir = conditions['wind_direction'][ni, nj]
+                                        angle_diff = abs(wind_angle - wind_dir)
+                                        if angle_diff > 180:
+                                            angle_diff = 360 - angle_diff
+                                        wind_factor = np.cos(np.radians(angle_diff))
+                                        spread_prob *= (1 + wind_factor) / 2
+                                    if np.random.rand() < 0.05:
+                                        continue
+                                    spread_probs.append(spread_prob)
+                                    if np.random.random() < spread_prob:
+                                        new_fire_grid[i, j] = 1  # Fire spreads
+            # Burnout logic: burning cells become burned out
+            new_fire_grid[self.fire_grid == 1] = 2
+            self.fire_grid = new_fire_grid
+            burned_area = np.sum(self.fire_grid == 2)
+            self.burned_areas.append(burned_area)
+            if spread_probs:
+                print(f"Iteration {iteration+1}, avg spread prob: {np.mean(spread_probs):.3f}")
+            # New convergence check: stop if no currently burning cells
+            if np.sum(self.fire_grid == 1) == 0:
+                print(f"Simulation converged after {iteration + 1} iterations (no burning cells left)")
+                break
+        return self.fire_grid, self.burned_areas
+    
+    def visualize_results(self):
+        """Visualize the simulation results."""
+        # Plot final fire spread
+        plt.figure(figsize=(10, 8))
+        plt.imshow(self.fire_grid, cmap='Reds', origin='lower',
+                  extent=[self.env.min_lon, self.env.max_lon, 
+                         self.env.min_lat, self.env.max_lat],
+                  aspect='auto')
+        plt.colorbar(label='Fire Spread')
+        if self.environmental_history:
+            last_quarter = self.environmental_history[-1].get('quarter', 'Unknown')
+        else:
+            last_quarter = 'Unknown'
+        plt.title(f'Wildfire Spread Simulation (Quarter {last_quarter})')
+        plt.xlabel('Longitude')
+        plt.ylabel('Latitude')
+        plt.savefig('wildfire_spread_simulation.png')
+        plt.close()
+        
+        # Plot burned area over time
+        plt.figure(figsize=(10, 4))
+        plt.plot(self.burned_areas)
+        plt.title('Burned Area Over Time')
+        plt.xlabel('Iteration')
+        plt.ylabel('Burned Area (cells)')
+        plt.grid(True)
+        plt.savefig('burned_area_over_time.png')
+        plt.close()
+        
+        # Plot environmental conditions for the last iteration
+        if self.environmental_history:
+            last_conditions = self.environmental_history[-1]
+            fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+            
+            # Temperature
+            im0 = axes[0,0].imshow(last_conditions['temperature'], cmap='Reds', origin='lower',
+                                  extent=[self.env.min_lon, self.env.max_lon, 
+                                         self.env.min_lat, self.env.max_lat])
+            axes[0,0].set_title('Temperature')
+            plt.colorbar(im0, ax=axes[0,0])
+            
+            # Humidity
+            im1 = axes[0,1].imshow(last_conditions['humidity'], cmap='Blues', origin='lower',
+                                  extent=[self.env.min_lon, self.env.max_lon, 
+                                         self.env.min_lat, self.env.max_lat])
+            axes[0,1].set_title('Humidity')
+            plt.colorbar(im1, ax=axes[0,1])
+            
+            # Wind Speed
+            im2 = axes[1,0].imshow(last_conditions['wind_speed'], cmap='Greens', origin='lower',
+                                  extent=[self.env.min_lon, self.env.max_lon, 
+                                         self.env.min_lat, self.env.max_lat])
+            axes[1,0].set_title('Wind Speed')
+            plt.colorbar(im2, ax=axes[1,0])
+            
+            # Wind Direction
+            im3 = axes[1,1].imshow(last_conditions['wind_direction'], cmap='Purples', origin='lower',
+                                  extent=[self.env.min_lon, self.env.max_lon, 
+                                         self.env.min_lat, self.env.max_lat])
+            axes[1,1].set_title('Wind Direction')
+            plt.colorbar(im3, ax=axes[1,1])
+            
+            plt.tight_layout()
+            plt.savefig('final_environmental_conditions.png')
+            plt.close()
+
+def main():
+    # Create and run simulation
+    sim = WildfireSimulation()
+    fire_grid, burned_areas = sim.simulate_spread()
+    
+    # Save results
+    np.save('final_fire_spread.npy', fire_grid)
+    np.save('burned_areas.npy', np.array(burned_areas))
+    
+    # Visualize results
+    sim.visualize_results()
+    
+    print(f"Final burned area: {burned_areas[-1]} cells")
+    print(f"Total iterations: {len(burned_areas) - 1}")
+
+if __name__ == "__main__":
+    main()
+
+N_RUNS = 100
+final_burned_areas = []
+all_iterations = []
+
+for run in range(N_RUNS):
+    sim = WildfireSimulation()
+    fire_grid, burned_areas = sim.simulate_spread()
+    final_burned_areas.append(burned_areas[-1])
+    all_iterations.append(len(burned_areas) - 1)  # -1 because burned_areas includes initial state
+
+print(f"Average burned area: {np.mean(final_burned_areas):.2f} ± {np.std(final_burned_areas):.2f}")
+print(f"Average number of iterations: {np.mean(all_iterations):.2f} ± {np.std(all_iterations):.2f}")
+
+# Optional: plot histogram
+plt.hist(final_burned_areas, bins=20, color='orange', edgecolor='k')
+plt.xlabel('Final Burned Area (cells)')
+plt.ylabel('Frequency')
+plt.title('Distribution of Burned Areas (100 Monte Carlo Runs)')
+plt.show() 

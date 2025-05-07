@@ -5,6 +5,7 @@ import requests
 import time
 import os
 from scipy.ndimage import gaussian_filter
+from scipy.stats import norm
 
 class EnvironmentalFactors:
     def __init__(self, grid_size=25, min_lat=32.5, max_lat=33.5, min_lon=-117.6, max_lon=-116.1, dataset="etopo1"):
@@ -63,10 +64,12 @@ class EnvironmentalFactors:
         wind_dir_grid = np.zeros((self.grid_size, self.grid_size))
         wind_speed_values = self._get_quarter_data(df, 'DailyAverageWindSpeed', quarter)
         wind_dir_values = self._get_quarter_data(df, 'DailyPeakWindDirection', quarter)
-        for i in range(self.grid_size):
-            for j in range(self.grid_size):
-                wind_speed_grid[i, j] = np.random.choice(wind_speed_values)
-                wind_dir_grid[i, j] = np.random.choice(wind_dir_values)
+        # Fit normal distributions
+        mu_speed, sigma_speed = norm.fit(wind_speed_values)
+        mu_dir, sigma_dir = norm.fit(wind_dir_values)
+        # Sample from fitted distributions
+        wind_speed_grid = np.clip(norm.rvs(mu_speed, sigma_speed, size=(self.grid_size, self.grid_size)), 0, None)
+        wind_dir_grid = np.clip(norm.rvs(mu_dir, sigma_dir, size=(self.grid_size, self.grid_size)), 0, 360)
         np.save('wind_speed_grid_25x25.npy', wind_speed_grid)
         np.save('wind_dir_grid_25x25.npy', wind_dir_grid)
         print(f'Saved: wind_speed_grid_25x25.npy and wind_dir_grid_25x25.npy (Quarter {quarter})')
@@ -75,7 +78,8 @@ class EnvironmentalFactors:
     def generate_humidity_grid(self, quarter, csv_path='climate.csv'):
         df = pd.read_csv(csv_path)
         humidity_values = self._get_quarter_data(df, 'DailyAverageRelativeHumidity', quarter)
-        humidity_grid = np.random.choice(humidity_values, size=(self.grid_size, self.grid_size))
+        mu, sigma = norm.fit(humidity_values)
+        humidity_grid = np.clip(norm.rvs(mu, sigma, size=(self.grid_size, self.grid_size)), 0, 100)
         np.save('humidity_grid_25x25.npy', humidity_grid)
         plt.figure(figsize=(7, 6))
         plt.imshow(humidity_grid, cmap='Blues', origin='lower', 
@@ -137,7 +141,8 @@ class EnvironmentalFactors:
         if 'DailyAverageDryBulbTemperature' not in df.columns:
             raise ValueError("'DailyAverageDryBulbTemperature' column not found in climate.csv")
         temp_values = self._get_quarter_data(df, 'DailyAverageDryBulbTemperature', quarter)
-        grid = np.random.choice(temp_values, size=(self.grid_size, self.grid_size))
+        mu, sigma = norm.fit(temp_values)
+        grid = norm.rvs(mu, sigma, size=(self.grid_size, self.grid_size))
         np.save('temperature_grid_25x25.npy', grid)
         plt.figure(figsize=(7, 6))
         plt.imshow(grid, cmap='Reds', origin='lower',

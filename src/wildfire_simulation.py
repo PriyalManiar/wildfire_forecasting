@@ -41,36 +41,37 @@ class WildfireSimulation:
         self.environmental_history.append(conditions)
         return conditions
         
-    def calculate_spread_probability(self, i, j, conditions):
-        """Calculate probability of fire spread to a cell based on environmental factors."""
+    def wind_influence(self, wind_dir, di, dj):
+        # wind_dir in degrees, di/dj are -1, 0, 1
+        if di == 0 and dj == 0:
+            return 1.0
+        cell_angle = np.arctan2(dj, di) * 180 / np.pi
+        angle_diff = abs(cell_angle - wind_dir)
+        if angle_diff > 180:
+            angle_diff = 360 - angle_diff
+        return max(0, np.cos(np.radians(angle_diff)))  # 1 if aligned, 0 if perpendicular, 0 if opposite
+
+    def humidity_factor(self, h):
+        return max(0, 1 - h / 100)
+
+    def calculate_spread_probability(self, i, j, conditions, di, dj, ni, nj):
         # Base probability from ignition points and vegetation
         base_prob = self.ignition_points[i, j] * self.vegetation[i, j]
-        
-        # Temperature effect (higher temp = higher spread)
         temp_effect = (conditions['temperature'][i, j] - np.min(conditions['temperature'])) / \
                      (np.max(conditions['temperature']) - np.min(conditions['temperature']))
-        
-        # Humidity effect (lower humidity = higher spread)
         humidity_effect = 1 - (conditions['humidity'][i, j] - np.min(conditions['humidity'])) / \
                          (np.max(conditions['humidity']) - np.min(conditions['humidity']))
-        
-        # Wind effect (higher wind = higher spread)
         wind_effect = (conditions['wind_speed'][i, j] - np.min(conditions['wind_speed'])) / \
                      (np.max(conditions['wind_speed']) - np.min(conditions['wind_speed']))
-        
-        # Elevation effect (higher elevation = lower spread)
         elevation_effect = 1 - (self.elevation[i, j] - np.min(self.elevation)) / \
                           (np.max(self.elevation) - np.min(self.elevation))
-        
-        # Combine effects with tuned weights
         weights = {
             'base': 0.2,
             'temperature': 0.1,
-            'humidity': 0.4,       # Stronger suppression
+            'humidity': 0.4,
             'wind': 0.2,
             'elevation': 0.1
         }
-        
         spread_prob = (
             weights['base'] * base_prob +
             weights['temperature'] * temp_effect +
@@ -78,53 +79,51 @@ class WildfireSimulation:
             weights['wind'] * wind_effect +
             weights['elevation'] * elevation_effect
         )
-        # Cap the maximum spread probability
+        # Wind and humidity physical influence
+        wind_factor = self.wind_influence(conditions['wind_direction'][ni, nj], di, dj)
+        humidity_mod = self.humidity_factor(conditions['humidity'][i, j])
+        spread_prob *= wind_factor * humidity_mod
         spread_prob = min(spread_prob, 0.4)
         return spread_prob
-    
+
     def simulate_spread(self):
         """Simulate wildfire spread until convergence or max iterations."""
-        # 0 = unburned, 1 = burning, 2 = burned out
         self.fire_grid = self.ignition_points.copy()
         self.burned_areas = [np.sum(self.fire_grid == 1)]
+        k = 3  # Number of consecutive steps for convergence
+        recent_changes = []
         for iteration in range(self.max_iterations):
             conditions = self.sample_environmental_conditions()
             new_fire_grid = self.fire_grid.copy()
             spread_probs = []
             for i in range(self.grid_size):
                 for j in range(self.grid_size):
-                    if self.fire_grid[i, j] == 0:  # If cell is not burning or burned
+                    if self.fire_grid[i, j] == 0:
                         for di in [-1, 0, 1]:
                             for dj in [-1, 0, 1]:
                                 ni, nj = i + di, j + dj
-                                if (0 <= ni < self.grid_size and 
-                                    0 <= nj < self.grid_size and 
-                                    self.fire_grid[ni, nj] == 1):  # If neighbor is burning
-                                    spread_prob = self.calculate_spread_probability(i, j, conditions)
-                                    if di != 0 or dj != 0:
-                                        wind_angle = np.arctan2(dj, di) * 180 / np.pi
-                                        wind_dir = conditions['wind_direction'][ni, nj]
-                                        angle_diff = abs(wind_angle - wind_dir)
-                                        if angle_diff > 180:
-                                            angle_diff = 360 - angle_diff
-                                        wind_factor = np.cos(np.radians(angle_diff))
-                                        spread_prob *= (1 + wind_factor) / 2
+                                if (0 <= ni < self.grid_size and 0 <= nj < self.grid_size and self.fire_grid[ni, nj] == 1):
+                                    spread_prob = self.calculate_spread_probability(i, j, conditions, di, dj, ni, nj)
                                     if np.random.rand() < 0.05:
                                         continue
                                     spread_probs.append(spread_prob)
                                     if np.random.random() < spread_prob:
-                                        new_fire_grid[i, j] = 1  # Fire spreads
-            # Burnout logic: burning cells become burned out
+                                        new_fire_grid[i, j] = 1
             new_fire_grid[self.fire_grid == 1] = 2
             self.fire_grid = new_fire_grid
             burned_area = np.sum(self.fire_grid == 2)
             self.burned_areas.append(burned_area)
             if spread_probs:
                 print(f"Iteration {iteration+1}, avg spread prob: {np.mean(spread_probs):.3f}")
-            # New convergence check: stop if no currently burning cells
-            if np.sum(self.fire_grid == 1) == 0:
-                print(f"Simulation converged after {iteration + 1} iterations (no burning cells left)")
-                break
+            # Convergence: relative change in burned area <1% for k consecutive steps
+            if len(self.burned_areas) > 1:
+                rel_change = abs(self.burned_areas[-1] - self.burned_areas[-2]) / max(1, self.burned_areas[-2])
+                recent_changes.append(rel_change)
+                if len(recent_changes) > k:
+                    recent_changes.pop(0)
+                if len(recent_changes) == k and all(change < 0.01 for change in recent_changes):
+                    print(f"Simulation converged after {iteration + 1} iterations (burned area stabilized)")
+                    break
         return self.fire_grid, self.burned_areas
     
     def visualize_results(self):

@@ -6,6 +6,7 @@ import time
 import os
 from scipy.ndimage import gaussian_filter
 from scipy.stats import norm
+from scipy.stats import truncnorm, norm
 
 class EnvironmentalFactors:
     def __init__(self, grid_size=25, min_lat=32.5, max_lat=33.5, min_lon=-117.6, max_lon=-116.1, dataset="etopo1"):
@@ -75,24 +76,57 @@ class EnvironmentalFactors:
         print(f'Saved: wind_speed_grid_25x25.npy and wind_dir_grid_25x25.npy (Quarter {quarter})')
         return wind_speed_grid, wind_dir_grid
 
-    def generate_humidity_grid(self, quarter, csv_path='climate.csv'):
+    # def generate_humidity_grid(self, quarter, csv_path='climate.csv'):
+    #     df = pd.read_csv(csv_path)
+    #     humidity_values = self._get_quarter_data(df, 'DailyAverageRelativeHumidity', quarter)
+    #     mu, sigma = norm.fit(humidity_values)
+    #     humidity_grid = np.clip(norm.rvs(mu, sigma, size=(self.grid_size, self.grid_size)), 0, 100)
+    #     np.save('humidity_grid_25x25.npy', humidity_grid)
+    #     plt.figure(figsize=(7, 6))
+    #     plt.imshow(humidity_grid, cmap='Blues', origin='lower',
+    #               extent=[self.min_lon, self.max_lon, self.min_lat, self.max_lat],
+    #               aspect='auto')
+    #     plt.colorbar(label='Relative Humidity (%)')
+    #     plt.title(f'Quarterly Humidity Grid (Quarter {quarter})')
+    #     plt.xlabel('Longitude')
+    #     plt.ylabel('Latitude')
+    #     plt.tight_layout()
+    #     plt.savefig('humidity_grid_25x25.png')
+    #     plt.close()
+    #     print(f'Saved: humidity_grid_25x25.png (Quarter {quarter})')
+    #     return humidity_grid
+
+    def generate_humidity_grid(self, quarter, high_humidity=False, csv_path='climate.csv'):
         df = pd.read_csv(csv_path)
         humidity_values = self._get_quarter_data(df, 'DailyAverageRelativeHumidity', quarter)
         mu, sigma = norm.fit(humidity_values)
-        humidity_grid = np.clip(norm.rvs(mu, sigma, size=(self.grid_size, self.grid_size)), 0, 100)
-        np.save('humidity_grid_25x25.npy', humidity_grid)
+
+        if high_humidity:
+            # Truncate normal distribution to values > 75%
+            lower, upper = 75, 100
+            a, b = (lower - mu) / sigma, (upper - mu) / sigma
+            humidity_grid = truncnorm.rvs(a, b, loc=mu, scale=sigma, size=(self.grid_size, self.grid_size))
+        else:
+            # Sample from full normal distribution, then clip to 0–100% range
+            humidity_grid = norm.rvs(mu, sigma, size=(self.grid_size, self.grid_size))
+            humidity_grid = np.clip(humidity_grid, 0, 100)
+
+        suffix = 'high' if high_humidity else 'baseline'
+        np.save(f'humidity_grid_25x25_{suffix}.npy', humidity_grid)
+
         plt.figure(figsize=(7, 6))
-        plt.imshow(humidity_grid, cmap='Blues', origin='lower', 
-                  extent=[self.min_lon, self.max_lon, self.min_lat, self.max_lat], 
-                  aspect='auto')
+        plt.imshow(humidity_grid, cmap='Blues', origin='lower',
+                   extent=[self.min_lon, self.max_lon, self.min_lat, self.max_lat],
+                   aspect='auto')
         plt.colorbar(label='Relative Humidity (%)')
-        plt.title(f'Quarterly Humidity Grid (Quarter {quarter})')
+        plt.title(f'Quarterly Humidity Grid (Quarter {quarter}) - {suffix.capitalize()}')
         plt.xlabel('Longitude')
         plt.ylabel('Latitude')
         plt.tight_layout()
-        plt.savefig('humidity_grid_25x25.png')
+        plt.savefig(f'humidity_grid_25x25_{suffix}.png')
         plt.close()
-        print(f'Saved: humidity_grid_25x25.png (Quarter {quarter})')
+
+        print(f'Saved: humidity_grid_25x25_{suffix}.png (Quarter {quarter})')
         return humidity_grid
 
     def generate_vegetation_ignition_grid(self, folder='vegetation', density_factor=1):

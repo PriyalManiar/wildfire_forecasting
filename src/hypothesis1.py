@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 from environmental_factors import EnvironmentalFactors
 from scipy.ndimage import gaussian_filter
 import random
+from scipy.stats import ttest_ind
+
+
 
 class WildfireSimulation:
     def __init__(self, grid_size=25, max_iterations=50, convergence_threshold=0.0001):
@@ -10,25 +13,25 @@ class WildfireSimulation:
         self.max_iterations = max_iterations
         self.convergence_threshold = convergence_threshold
         self.env = EnvironmentalFactors(grid_size=grid_size)
-        
+
         # Load static features
         self.elevation = self.env.generate_elevation_grid()
         self.vegetation = self.env.generate_vegetation_ignition_grid(density_factor=3)
-        
+
         # Load ignition points (fire presence)
         self.ignition_points = np.load('fire_frequent_cells_25x25_southeast_us.npy')
-        
+
         # Initialize fire spread grid
         self.fire_grid = np.zeros((grid_size, grid_size))
         self.burned_areas = []
-        
+
         # Store environmental conditions for each iteration
         self.environmental_history = []
-        
-    def sample_environmental_conditions(self):
+
+    def sample_environmental_conditions(self,high_humidity =False):
         """Sample new environmental conditions for the current iteration."""
         quarter = random.choice(['Q1', 'Q2', 'Q3', 'Q4'])
-        humidity = self.env.generate_humidity_grid(quarter)
+        humidity = self.env.generate_humidity_grid(quarter, high_humidity= high_humidity)
         wind_speed, wind_direction = self.env.generate_wind_grids(quarter)
         temperature = self.env.temperature_grid(quarter)
         conditions = {
@@ -41,7 +44,7 @@ class WildfireSimulation:
         }
         self.environmental_history.append(conditions)
         return conditions
-        
+
     def wind_influence(self, wind_dir, di, dj):
         # wind_dir in degrees, di/dj are -1, 0, 1
         if di == 0 and dj == 0:
@@ -59,13 +62,13 @@ class WildfireSimulation:
         # Base probability from ignition points and vegetation
         base_prob = self.ignition_points[i, j] * self.vegetation[i, j]
         temp_effect = (conditions['temperature'][i, j] - np.min(conditions['temperature'])) / \
-                     (np.max(conditions['temperature']) - np.min(conditions['temperature']))
+                      (np.max(conditions['temperature']) - np.min(conditions['temperature']))
         humidity_effect = 1 - (conditions['humidity'][i, j] - np.min(conditions['humidity'])) / \
-                         (np.max(conditions['humidity']) - np.min(conditions['humidity']))
+                          (np.max(conditions['humidity']) - np.min(conditions['humidity']))
         wind_effect = (conditions['wind_speed'][i, j] - np.min(conditions['wind_speed'])) / \
-                     (np.max(conditions['wind_speed']) - np.min(conditions['wind_speed']))
+                      (np.max(conditions['wind_speed']) - np.min(conditions['wind_speed']))
         elevation_effect = 1 - (self.elevation[i, j] - np.min(self.elevation)) / \
-                          (np.max(self.elevation) - np.min(self.elevation))
+                           (np.max(self.elevation) - np.min(self.elevation))
         weights = {
             'base': 0.2,
             'temperature': 0.45,
@@ -75,11 +78,11 @@ class WildfireSimulation:
             'vegetation': 0.3,
         }
         spread_prob = (
-            weights['base'] * base_prob +
-            weights['temperature'] * temp_effect +
-            weights['humidity'] * humidity_effect +
-            weights['wind'] * wind_effect +
-            weights['elevation'] * elevation_effect
+                weights['base'] * base_prob +
+                weights['temperature'] * temp_effect +
+                weights['humidity'] * humidity_effect +
+                weights['wind'] * wind_effect +
+                weights['elevation'] * elevation_effect
         )
         # Wind and humidity physical influence
         wind_factor = self.wind_influence(conditions['wind_direction'][ni, nj], di, dj)
@@ -88,7 +91,7 @@ class WildfireSimulation:
         spread_prob = max(spread_prob, 0.25)
         return spread_prob
 
-    def simulate_spread(self):
+    def simulate_spread(self,high_humidity=False):
         """Simulate wildfire spread until convergence or max iterations."""
 
         self.fire_grid = self.ignition_points.copy()
@@ -96,7 +99,7 @@ class WildfireSimulation:
         k = 30  # Number of consecutive steps for convergence
         recent_changes = []
         for iteration in range(self.max_iterations):
-            conditions = self.sample_environmental_conditions()
+            conditions = self.sample_environmental_conditions(high_humidity=high_humidity)
             new_fire_grid = self.fire_grid.copy()
             spread_probs = []
             for i in range(self.grid_size):
@@ -105,7 +108,8 @@ class WildfireSimulation:
                         for di in [-1, 0, 1]:
                             for dj in [-1, 0, 1]:
                                 ni, nj = i + di, j + dj
-                                if (0 <= ni < self.grid_size and 0 <= nj < self.grid_size and self.fire_grid[ni, nj] == 1):
+                                if (0 <= ni < self.grid_size and 0 <= nj < self.grid_size and self.fire_grid[
+                                    ni, nj] == 1):
                                     spread_prob = self.calculate_spread_probability(i, j, conditions, di, dj, ni, nj)
                                     # if np.random.rand() < 0.05:
                                     #     continue
@@ -117,7 +121,7 @@ class WildfireSimulation:
             burned_area = np.sum(self.fire_grid == 2)
             self.burned_areas.append(burned_area)
             if spread_probs:
-                print(f"Iteration {iteration+1}, avg spread prob: {np.mean(spread_probs):.3f}")
+                print(f"Iteration {iteration + 1}, avg spread prob: {np.mean(spread_probs):.3f}")
             # Convergence: relative change in burned area <1% for k consecutive steps
             if len(self.burned_areas) > 1:
                 rel_change = abs(self.burned_areas[-1] - self.burned_areas[-2]) / max(1, self.burned_areas[-2])
@@ -133,15 +137,15 @@ class WildfireSimulation:
                         break
 
         return self.fire_grid, self.burned_areas
-    
+
     def visualize_results(self):
         """Visualize the simulation results."""
         # Plot final fire spread
         plt.figure(figsize=(10, 8))
         plt.imshow(self.fire_grid, cmap='Reds', origin='lower',
-                  extent=[self.env.min_lon, self.env.max_lon, 
-                         self.env.min_lat, self.env.max_lat],
-                  aspect='auto')
+                   extent=[self.env.min_lon, self.env.max_lon,
+                           self.env.min_lat, self.env.max_lat],
+                   aspect='auto')
         plt.colorbar(label='Fire Spread')
         if self.environmental_history:
             last_quarter = self.environmental_history[-1].get('quarter', 'Unknown')
@@ -152,7 +156,7 @@ class WildfireSimulation:
         plt.ylabel('Latitude')
         plt.savefig('wildfire_spread_simulation.png')
         plt.close()
-        
+
         # Plot burned area over time
         plt.figure(figsize=(10, 4))
         plt.plot(self.burned_areas)
@@ -162,57 +166,58 @@ class WildfireSimulation:
         plt.grid(True)
         plt.savefig('burned_area_over_time.png')
         plt.close()
-        
+
         # Plot environmental conditions for the last iteration
         if self.environmental_history:
             last_conditions = self.environmental_history[-1]
             fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-            
+
             # Temperature
-            im0 = axes[0,0].imshow(last_conditions['temperature'], cmap='Reds', origin='lower',
-                                  extent=[self.env.min_lon, self.env.max_lon, 
-                                         self.env.min_lat, self.env.max_lat])
-            axes[0,0].set_title('Temperature')
-            plt.colorbar(im0, ax=axes[0,0])
-            
+            im0 = axes[0, 0].imshow(last_conditions['temperature'], cmap='Reds', origin='lower',
+                                    extent=[self.env.min_lon, self.env.max_lon,
+                                            self.env.min_lat, self.env.max_lat])
+            axes[0, 0].set_title('Temperature')
+            plt.colorbar(im0, ax=axes[0, 0])
+
             # Humidity
-            im1 = axes[0,1].imshow(last_conditions['humidity'], cmap='Blues', origin='lower',
-                                  extent=[self.env.min_lon, self.env.max_lon, 
-                                         self.env.min_lat, self.env.max_lat])
-            axes[0,1].set_title('Humidity')
-            plt.colorbar(im1, ax=axes[0,1])
-            
+            im1 = axes[0, 1].imshow(last_conditions['humidity'], cmap='Blues', origin='lower',
+                                    extent=[self.env.min_lon, self.env.max_lon,
+                                            self.env.min_lat, self.env.max_lat])
+            axes[0, 1].set_title('Humidity')
+            plt.colorbar(im1, ax=axes[0, 1])
+
             # Wind Speed
-            im2 = axes[1,0].imshow(last_conditions['wind_speed'], cmap='Greens', origin='lower',
-                                  extent=[self.env.min_lon, self.env.max_lon, 
-                                         self.env.min_lat, self.env.max_lat])
-            axes[1,0].set_title('Wind Speed')
-            plt.colorbar(im2, ax=axes[1,0])
-            
+            im2 = axes[1, 0].imshow(last_conditions['wind_speed'], cmap='Greens', origin='lower',
+                                    extent=[self.env.min_lon, self.env.max_lon,
+                                            self.env.min_lat, self.env.max_lat])
+            axes[1, 0].set_title('Wind Speed')
+            plt.colorbar(im2, ax=axes[1, 0])
+
             # Wind Direction
-            im3 = axes[1,1].imshow(last_conditions['wind_direction'], cmap='Purples', origin='lower',
-                                  extent=[self.env.min_lon, self.env.max_lon, 
-                                         self.env.min_lat, self.env.max_lat])
-            axes[1,1].set_title('Wind Direction')
-            plt.colorbar(im3, ax=axes[1,1])
-            
+            im3 = axes[1, 1].imshow(last_conditions['wind_direction'], cmap='Purples', origin='lower',
+                                    extent=[self.env.min_lon, self.env.max_lon,
+                                            self.env.min_lat, self.env.max_lat])
+            axes[1, 1].set_title('Wind Direction')
+            plt.colorbar(im3, ax=axes[1, 1])
+
             plt.tight_layout()
             plt.savefig('final_environmental_conditions.png')
             plt.close()
+
 
 def main():
     # Create and run simulation
     sim = WildfireSimulation()
     fire_grid, burned_areas = sim.simulate_spread()
-    
+
     # Save results
     np.save('final_fire_spread.npy', fire_grid)
     np.save('burned_areas.npy', np.array(burned_areas))
-    
+
     # Visualize results
     sim.visualize_results()
 
-    #Adding Convergence plot
+    # Adding Convergence plot
     # Load the burned areas data
     burned_areas = np.load('burned_areas.npy')
 
@@ -235,29 +240,45 @@ def main():
     plt.show()
 
     print("Convergence analysis plot saved as 'convergence_analysis.png'")
-    
+
     print(f"Final burned area: {burned_areas[-1]} cells")
     print(f"Total iterations: {len(burned_areas) - 1}")
+
 
 if __name__ == "__main__":
     main()
 
 N_RUNS = 100
-final_burned_areas = []
-all_iterations = []
+scenarios = {'baseline': False, 'high_humidity': True}
+results = {}
 
-for run in range(N_RUNS):
-    sim = WildfireSimulation()
-    fire_grid, burned_areas = sim.simulate_spread()
-    final_burned_areas.append(burned_areas[-1])
-    all_iterations.append(len(burned_areas) - 1)  # -1 because burned_areas includes initial state
 
-print(f"Average burned area: {np.mean(final_burned_areas):.2f} ± {np.std(final_burned_areas):.2f}")
-print(f"Average number of iterations: {np.mean(all_iterations):.2f} ± {np.std(all_iterations):.2f}")
+for scenario_name, high_humidity in scenarios.items():
+    final_burned_areas = []
+    all_iterations = []
+    for run in range(N_RUNS):
+        sim = WildfireSimulation()
+        fire_grid, burned_areas = sim.simulate_spread(high_humidity=high_humidity)
+        final_burned_areas.append(burned_areas[-1])
+        all_iterations.append(len(burned_areas) - 1)
+    results[scenario_name] = {
+        'burned_areas': final_burned_areas,
+        'iterations': all_iterations,
+        'mean_burned': np.mean(final_burned_areas),
+        'std_burned': np.std(final_burned_areas),
+    }
+    print(f"{scenario_name.capitalize()} - Average burned area: {np.mean(final_burned_areas):.2f} ± {np.std(final_burned_areas):.2f}")
+    print(f"{scenario_name.capitalize()} - Average iterations: {np.mean(all_iterations):.2f} ± {np.std(all_iterations):.2f}")
 
-# Optional: plot histogram
-plt.hist(final_burned_areas, bins=20, color='orange', edgecolor='k')
+baseline_mean = results['baseline']['mean_burned']
+high_humidity_mean = results['high_humidity']['mean_burned']
+reduction = ((baseline_mean - high_humidity_mean) / baseline_mean) * 100
+print(f"\nReduction in burned area due to high humidity: {reduction:.2f}%")
+
+plt.hist(results['baseline']['burned_areas'], bins=20, alpha=0.5, label='Baseline')
+plt.hist(results['high_humidity']['burned_areas'], bins=20, alpha=0.5, label='High Humidity')
 plt.xlabel('Final Burned Area (cells)')
 plt.ylabel('Frequency')
-plt.title('Distribution of Burned Areas (100 Monte Carlo Runs)')
-plt.show() 
+plt.title('Distribution of Burned Areas')
+plt.legend()
+plt.show()

@@ -129,7 +129,7 @@ class EnvironmentalFactors:
         print(f'Saved: humidity_grid_25x25_{suffix}.png (Quarter {quarter})')
         return humidity_grid
 
-    def generate_vegetation_ignition_grid(self, folder='vegetation', density_factor=1):
+    def generate_vegetation_ignition_grid(self, folder='vegetation', hypothesis_dense_shrub=False,density_factor=1):
         ignition_probs = {
             "Openshrub": 0.4, "C3_grass": 0.6, "C3past": 0.3,
             "DenseShrub": 0.5, "SecTmpENF": 0.3, "tmpENF": 0.6,
@@ -149,6 +149,8 @@ class EnvironmentalFactors:
                         lon -= 360
                     if pd.isna(perc):
                         continue
+                    if veg_key == "DenseShrub" and hypothesis_dense_shrub:
+                        perc = min(perc * 1.10, 100)  # Increase by 10%, cap at 100%
                     i = np.digitize(lat, self.lat_grid) - 1
                     j = np.digitize(lon, self.lon_grid) - 1
                     if 0 <= i < self.grid_size and 0 <= j < self.grid_size:
@@ -159,7 +161,7 @@ class EnvironmentalFactors:
 
             ignition_grid += (veg_grid / 100.0) * ign_prob
 
-        ignition_grid *= density_factor
+        ignition_grid *= 1  # Assuming density_factor is 1
 
         # Ensure the ignition grid values stay within the [0, 1] range
         ignition_grid = np.clip(ignition_grid, 0, 1)
@@ -198,7 +200,7 @@ class EnvironmentalFactors:
         print(f'Saved: temperature_grid_25x25.png (Quarter {quarter})')
         return grid
 
-def main():
+def main(hypothesis_dense_shrub=False):
     env = EnvironmentalFactors(grid_size=25, min_lat=32.5, max_lat=33.5, min_lon=-117.6, max_lon=-116.1)
     print(f"Selected Quarter: {env.quarter}")
 
@@ -212,11 +214,10 @@ def main():
     humidity = env.generate_humidity_grid(env.quarter)
 
     print("Generating Vegetation Ignition Probability Grid...")
-    ignition = env.generate_vegetation_ignition_grid()
+    ignition = env.generate_vegetation_ignition_grid(hypothesis_dense_shrub=hypothesis_dense_shrub)
 
     print("Generating Temperature Grid...")
     temperature = env.temperature_grid(env.quarter)
 
 if __name__ == "__main__":
     main()
-

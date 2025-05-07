@@ -95,7 +95,7 @@ class EnvironmentalFactors:
         print(f'Saved: humidity_grid_25x25.png (Quarter {quarter})')
         return humidity_grid
 
-    def generate_vegetation_ignition_grid(self, folder='vegetation'):
+    def generate_vegetation_ignition_grid(self, folder='vegetation', density_factor=1):
         ignition_probs = {
             "Openshrub": 0.4, "C3_grass": 0.6, "C3past": 0.3,
             "DenseShrub": 0.5, "SecTmpENF": 0.3, "tmpENF": 0.6,
@@ -122,7 +122,13 @@ class EnvironmentalFactors:
                 except:
                     continue
 
+
             ignition_grid += (veg_grid / 100.0) * ign_prob
+
+        ignition_grid *= density_factor
+
+        # Ensure the ignition grid values stay within the [0, 1] range
+        ignition_grid = np.clip(ignition_grid, 0, 1)
 
         np.save('ignition_probability_25x25.npy', ignition_grid)
         plt.imshow(ignition_grid, cmap='OrRd', origin='lower',

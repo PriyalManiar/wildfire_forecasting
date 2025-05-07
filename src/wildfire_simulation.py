@@ -5,7 +5,7 @@ from scipy.ndimage import gaussian_filter
 import random
 
 class WildfireSimulation:
-    def __init__(self, grid_size=25, max_iterations=100, convergence_threshold=0.01):
+    def __init__(self, grid_size=25, max_iterations=5, convergence_threshold=0.0001):
         self.grid_size = grid_size
         self.max_iterations = max_iterations
         self.convergence_threshold = convergence_threshold
@@ -13,7 +13,7 @@ class WildfireSimulation:
         
         # Load static features
         self.elevation = self.env.generate_elevation_grid()
-        self.vegetation = self.env.generate_vegetation_ignition_grid()
+        self.vegetation = self.env.generate_vegetation_ignition_grid(density_factor=3)
         
         # Load ignition points (fire presence)
         self.ignition_points = np.load('fire_frequent_cells_25x25_southeast_us.npy')
@@ -36,7 +36,8 @@ class WildfireSimulation:
             'wind_speed': wind_speed,
             'wind_direction': wind_direction,
             'temperature': temperature,
-            'quarter': quarter
+            'quarter': quarter,
+
         }
         self.environmental_history.append(conditions)
         return conditions
@@ -67,10 +68,11 @@ class WildfireSimulation:
                           (np.max(self.elevation) - np.min(self.elevation))
         weights = {
             'base': 0.2,
-            'temperature': 0.1,
+            'temperature': 0.45,
             'humidity': 0.4,
-            'wind': 0.2,
-            'elevation': 0.1
+            'wind': 0.32,
+            'elevation': 0.4,
+            'vegetation': 0.3,
         }
         spread_prob = (
             weights['base'] * base_prob +
@@ -83,14 +85,15 @@ class WildfireSimulation:
         wind_factor = self.wind_influence(conditions['wind_direction'][ni, nj], di, dj)
         humidity_mod = self.humidity_factor(conditions['humidity'][i, j])
         spread_prob *= wind_factor * humidity_mod
-        spread_prob = min(spread_prob, 0.4)
+        spread_prob = max(spread_prob, 0.25)
         return spread_prob
 
     def simulate_spread(self):
         """Simulate wildfire spread until convergence or max iterations."""
+
         self.fire_grid = self.ignition_points.copy()
         self.burned_areas = [np.sum(self.fire_grid == 1)]
-        k = 3  # Number of consecutive steps for convergence
+        k = 30  # Number of consecutive steps for convergence
         recent_changes = []
         for iteration in range(self.max_iterations):
             conditions = self.sample_environmental_conditions()
@@ -104,8 +107,8 @@ class WildfireSimulation:
                                 ni, nj = i + di, j + dj
                                 if (0 <= ni < self.grid_size and 0 <= nj < self.grid_size and self.fire_grid[ni, nj] == 1):
                                     spread_prob = self.calculate_spread_probability(i, j, conditions, di, dj, ni, nj)
-                                    if np.random.rand() < 0.05:
-                                        continue
+                                    # if np.random.rand() < 0.05:
+                                    #     continue
                                     spread_probs.append(spread_prob)
                                     if np.random.random() < spread_prob:
                                         new_fire_grid[i, j] = 1
@@ -121,9 +124,14 @@ class WildfireSimulation:
                 recent_changes.append(rel_change)
                 if len(recent_changes) > k:
                     recent_changes.pop(0)
+                # if len(recent_changes) == k and all(change < 0.005 for change in recent_changes):
+                #     print(f"Simulation converged after {iteration + 1} iterations (burned area stabilized)")
+                #     break
                 if len(recent_changes) == k and all(change < 0.01 for change in recent_changes):
-                    print(f"Simulation converged after {iteration + 1} iterations (burned area stabilized)")
-                    break
+                    if np.sum(self.fire_grid == 1) == 0:  # No active fires
+                        print(f"Simulation converged after {iteration + 1} iterations (burned area stabilized)")
+                        break
+
         return self.fire_grid, self.burned_areas
     
     def visualize_results(self):
@@ -203,6 +211,30 @@ def main():
     
     # Visualize results
     sim.visualize_results()
+
+    #Adding Convergence plot
+    # Load the burned areas data
+    burned_areas = np.load('burned_areas.npy')
+
+    # Calculate relative changes
+    relative_changes = [
+        abs(burned_areas[i] - burned_areas[i - 1]) / max(1, burned_areas[i - 1])
+        for i in range(1, len(burned_areas))
+    ]
+
+    # Plot the convergence graph
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, len(burned_areas)), relative_changes, marker='o', linestyle='-')
+    plt.axhline(y=0.01, color='r', linestyle='--', label='Convergence Threshold (1%)')
+    plt.title('Convergence Analysis of Burned Area')
+    plt.xlabel('Iteration')
+    plt.ylabel('Relative Change in Burned Area')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig('convergence_analysis.png')
+    plt.show()
+
+    print("Convergence analysis plot saved as 'convergence_analysis.png'")
     
     print(f"Final burned area: {burned_areas[-1]} cells")
     print(f"Total iterations: {len(burned_areas) - 1}")

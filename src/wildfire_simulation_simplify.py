@@ -2,7 +2,54 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 from environmental_factors import EnvironmentalFactors
+from multiprocessing import Pool, cpu_count
+from numba import jit, float64, int64, boolean
 
+@jit(nopython=True)
+def calculate_spread_probabilities(
+    grid_size, burning_cells, fire_grid, ignition_points, vegetation,
+    norm_temp, norm_humidity, norm_wind_speed, norm_elevation,
+    wind_direction, humidity, weights
+):
+    """Calculate spread probabilities using Numba JIT compilation."""
+    spread_prob = np.zeros((grid_size, grid_size), dtype=np.float64)
+    
+    for i in range(grid_size):
+        for j in range(grid_size):
+            if burning_cells[i, j]:
+                for di in [-1, 0, 1]:
+                    for dj in [-1, 0, 1]:
+                        ni, nj = i + di, j + dj
+                        if (0 <= ni < grid_size and 
+                            0 <= nj < grid_size and 
+                            fire_grid[ni, nj] == 0):
+                            
+                            # Calculate base probability
+                            base = ignition_points[ni, nj] * vegetation[ni, nj]
+                            
+                            prob = (
+                                weights[0] * base +
+                                weights[1] * norm_temp[ni, nj] +
+                                weights[2] * (1 - norm_humidity[ni, nj]) +
+                                weights[3] * norm_wind_speed[ni, nj] +
+                                weights[4] * (1 - norm_elevation[ni, nj])
+                            )
+                            
+                            # Calculate wind influence
+                            if di == 0 and dj == 0:
+                                wind_influence = 1.0
+                            else:
+                                angle_diff = abs(np.arctan2(dj, di) * 180 / np.pi - wind_direction[ni, nj]) % 360
+                                if angle_diff > 180:
+                                    angle_diff = 360 - angle_diff
+                                wind_influence = max(0, np.cos(np.radians(angle_diff)))
+                            
+                            # Apply wind influence and humidity factor
+                            prob *= wind_influence
+                            prob *= max(0, 1 - humidity[ni, nj] / 100)
+                            spread_prob[ni, nj] = max(prob, 0.20)
+    
+    return spread_prob
 
 class WildfireSimulation:
     def __init__(self, grid_size=25, max_iterations=100, convergence_threshold=0.01, hypothesis_dense_shrub=False):
@@ -16,18 +63,21 @@ class WildfireSimulation:
         self.fire_grid = np.zeros((grid_size, grid_size))
         self.burned_areas = []
         self.environmental_history = []
+        # Pick a random quarter once at the start of the simulation
+        self.quarter = random.choice(['Q1', 'Q2', 'Q3', 'Q4'])
+        self.weights = np.array([0.2, 0.3, 0.5, 0.25, 0.35])  # [base, temp, hum, wind, elev]
 
     def normalize(self, arr):
         return (arr - np.min(arr)) / (np.max(arr) - np.min(arr) + 1e-6)
 
     def sample_conditions(self):
-        q = random.choice(['Q1', 'Q2', 'Q3', 'Q4'])
+        wind_speed, wind_dir = self.env.generate_wind_grids(self.quarter)
         conds = {
-            'quarter': q,
-            'humidity': self.env.generate_humidity_grid(q),
-            'wind_speed': self.env.generate_wind_grids(q)[0],
-            'wind_direction': self.env.generate_wind_grids(q)[1],
-            'temperature': self.env.temperature_grid(q)
+            'quarter': self.quarter,
+            'humidity': self.env.generate_humidity_grid(self.quarter),
+            'wind_speed': wind_speed,
+            'wind_direction': wind_dir,
+            'temperature': self.env.temperature_grid(self.quarter)
         }
         self.environmental_history.append(conds)
         return conds
@@ -62,27 +112,44 @@ class WildfireSimulation:
 
         for iteration in range(self.max_iterations):
             conds = self.sample_conditions()
-            new_grid = self.fire_grid.copy()
-            for i in range(self.grid_size):
-                for j in range(self.grid_size):
-                    if self.fire_grid[i, j] == 0:
-                        for di in [-1, 0, 1]:
-                            for dj in [-1, 0, 1]:
-                                ni, nj = i + di, j + dj
-                                if 0 <= ni < self.grid_size and 0 <= nj < self.grid_size and self.fire_grid[ni, nj] == 1:
-                                    if np.random.rand() < self.calc_spread_prob(i, j, di, dj, ni, nj, conds):
-                                        new_grid[i, j] = 1
-            new_grid[self.fire_grid == 1] = 2
-            self.fire_grid = new_grid
-            self.burned_areas.append(np.sum(new_grid == 2))
-
+            
+            # Precompute normalized values for this iteration
+            norm_temp = self.normalize(conds['temperature'])
+            norm_humidity = self.normalize(conds['humidity'])
+            norm_wind_speed = self.normalize(conds['wind_speed'])
+            norm_elevation = self.normalize(self.elevation)
+            
+            # Create a mask for cells that can spread (currently burning)
+            burning_cells = (self.fire_grid == 1)
+            if not np.any(burning_cells):
+                break
+            
+            # Calculate spread probabilities using Numba-optimized function
+            spread_prob = calculate_spread_probabilities(
+                self.grid_size, burning_cells, self.fire_grid,
+                self.ignition_points, self.vegetation,
+                norm_temp, norm_humidity, norm_wind_speed, norm_elevation,
+                conds['wind_direction'], conds['humidity'],
+                self.weights
+            )
+            
+            # Apply spread probabilities
+            new_fires = (np.random.random(self.fire_grid.shape) < spread_prob) & (self.fire_grid == 0)
+            self.fire_grid[new_fires] = 1
+            self.fire_grid[burning_cells] = 2  # Mark old burning cells as burned
+            
+            # Update burned area
+            burned_area = np.sum(self.fire_grid == 2)
+            self.burned_areas.append(burned_area)
+            
+            # Check convergence
             rel_change = abs(self.burned_areas[-1] - self.burned_areas[-2]) / max(1, self.burned_areas[-2])
             recent_changes.append(rel_change)
             if len(recent_changes) > k:
                 recent_changes.pop(0)
             if len(recent_changes) == k and all(c < self.convergence_threshold for c in recent_changes):
-                if np.sum(self.fire_grid == 1) == 0:
-                    break
+                break
+                
         return self.fire_grid, self.burned_areas
 
     def plot_fire_map(self, path='wildfire_spread.png'):
@@ -140,16 +207,24 @@ def plot_monte_carlo_convergence(percentages, ma, window=10, path='mc_convergenc
     plt.savefig(path)
     plt.close()
 
+def run_single_simulation(args):
+    """Run a single simulation and return its results."""
+    sim = WildfireSimulation()
+    _, burned = sim.simulate_spread()
+    burned_cells = burned[-1]
+    total_cells = sim.grid_size * sim.grid_size
+    burned_pct = 100 * burned_cells / total_cells
+    return (burned_cells, len(burned)-1, burned_pct)
+
 def run_simulation(n_runs=100, mc_window=10, mc_last_n=5, mc_threshold=0.01):
-    results = []
-    for i in range(n_runs):
-        sim = WildfireSimulation()
-        _, burned = sim.simulate_spread()
-        burned_cells = burned[-1]
-        total_cells = sim.grid_size * sim.grid_size
-        burned_pct = 100 * burned_cells / total_cells
-        results.append((burned_cells, len(burned)-1, burned_pct))
-        print(f"Run {i+1}/{n_runs}: Burned {burned_pct:.2f}% of area ({burned_cells} cells) in {len(burned)-1} iterations")
+    # Use number of CPU cores minus 1 to leave one core free
+    n_cores = max(1, cpu_count() - 1)
+    print(f"Running {n_runs} simulations using {n_cores} CPU cores...")
+    
+    # Create a pool of workers
+    with Pool(n_cores) as pool:
+        # Run simulations in parallel
+        results = pool.map(run_single_simulation, [None] * n_runs)
     
     areas, iterations, percentages = zip(*results)
     print("\nSummary Statistics:")
@@ -179,4 +254,4 @@ def run_simulation(n_runs=100, mc_window=10, mc_last_n=5, mc_threshold=0.01):
 
 
 if __name__ == "__main__":
-    run_simulation(n_runs=1000)  # Run 1000 simulations for better convergence analysis
+    run_simulation(n_runs=100)  # Run 1000 simulations for better convergence analysis

@@ -79,6 +79,7 @@ def calculate_spread_probabilities(
                             )
 
                             # Calculate wind influence
+                            # Reference : Used the help of ChatGPT to devise the logic for wind direction computation implementation
                             if di == 0 and dj == 0:
                                 wind_influence = 1.0
                             else:

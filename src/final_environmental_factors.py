@@ -147,6 +147,15 @@ class EnvironmentalFactors:
         # Cache for reuse
         np.save('wind_speed_grid_25x25.npy', speed_grid)
         np.save('wind_dir_grid_25x25.npy', dir_grid)
+
+        plt.figure(figsize=(6, 5))
+        plt.imshow(speed_grid, cmap='Greens', origin='lower',
+                   extent=[self.min_lon, self.max_lon, self.min_lat, self.max_lat])
+        plt.colorbar(label='Wind Speed')
+        plt.title(f'Wind Speed Grid (Quarter {quarter})')
+        plt.savefig('wind_speed_grid.png')
+        plt.close()
+
         return speed_grid, dir_grid
 
     def generate_humidity_grid(self, quarter:str, csv_path:str='climate.csv')-> np.ndarray:
@@ -162,7 +171,7 @@ class EnvironmentalFactors:
         mu, sd = norm.fit(hums)
         grid = np.clip(norm.rvs(mu, sd, size=(self.grid_size, self.grid_size)), 0, 100)
         np.save('humidity_grid_25x25.npy', grid)
-        # Plot for quick sanity check
+
         plt.figure(figsize=(6,5))
         plt.imshow(grid, cmap='Blues', origin='lower',
                    extent=[self.min_lon, self.max_lon, self.min_lat, self.max_lat])

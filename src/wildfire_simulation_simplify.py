@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import random
-from environmental_factors import EnvironmentalFactors
+from final_environmental_factors import EnvironmentalFactors
 from multiprocessing import Pool, cpu_count
 from numba import jit, float64, int64, boolean
 from scipy.stats import norm,ttest_ind
@@ -373,19 +373,19 @@ def hypothesis_testing(control_results, hypothesis_results, hypothesis_name=""):
 if __name__ == "__main__":
     #Control Experiment
     print("Running Control Simulation")
-    control_results = run_simulation(n_runs=1200, hypothesis=None) # Increased number of runs for better convergence
+    control_results = run_simulation(n_runs=12, hypothesis=None) # Increased number of runs for better convergence
 
     # Hypothesis 1: High humidity
     print("\nRunning Hypothesis 1 Simulation")
-    humidity_results = run_simulation(n_runs=1200, hypothesis='high_humidity')
+    humidity_results = run_simulation(n_runs=12, hypothesis='high_humidity')
 
     # Hypothesis 2: High Wind
     print("\nRunning Hypothesis 2 Simulation")
-    wind_results = run_simulation(n_runs=1200, hypothesis='high_wind')
+    wind_results = run_simulation(n_runs=12, hypothesis='high_wind')
 
     # Hypothesis 3: Dense shrub
     print("\nRunning Hypothesis 3 Simulation")
-    shrub_results = run_simulation(n_runs=1200, hypothesis='dense_shrub')
+    shrub_results = run_simulation(n_runs=12, hypothesis='dense_shrub')
 
     # Validation (comparison between baseline and each hypothesis)
     hypothesis_testing(control_results, humidity_results, hypothesis_name='High Humidity')

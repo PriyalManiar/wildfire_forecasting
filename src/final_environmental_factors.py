@@ -12,7 +12,7 @@ class EnvironmentalFactors:
     Defines methods to generate environmental grids - elevation, wind, humidity,
     vegetation ignition probability, and temperature) for a given geographic area and quarter.
     """
-    # Shared class variables to cache grids if needed
+
     _elevation_grid = None
     _vegetation_grid = None
 
@@ -102,7 +102,7 @@ class EnvironmentalFactors:
         ":return: 2D Numpy array of elevation values
         """
         npy_file = 'elevation_grid_25x25.npy'
-        # If we saved it before, just load
+
         if os.path.exists(npy_file):
             return np.load(npy_file)
 
@@ -125,10 +125,10 @@ class EnvironmentalFactors:
                     elevation_list.extend([r['elevation'] for r in data])
                     break
                 elif resp.status_code == 429:
-                    time.sleep(2 * (attempt + 1))  # exponential backoff
+                    time.sleep(2 * (attempt + 1))
                 else:
                     time.sleep(1)
-            time.sleep(1)  # gentle rate limit
+            time.sleep(1)
 
         # Ensure we got full grid
         expected = self.grid_size ** 2
@@ -147,7 +147,7 @@ class EnvironmentalFactors:
 
     def generate_wind_grids(self, quarter:str, csv_path:str='climate.csv')-> tuple[np.ndarray, np.ndarray]:
         """
-        Reference : used chatgpt for 2nd doctest
+        Reference : used chatgpt for syntax of 3rd doctest
         Create wind speed and direction grids for the selected quarter.
 
         :param quarter: Name of the quarter to extract data from.
@@ -167,15 +167,16 @@ class EnvironmentalFactors:
 
         """
         df = pd.read_csv(csv_path)
-        # Extract raw values for stats
+
         speeds = self._get_quarter_data(df, 'DailyAverageWindSpeed', quarter)
         dirs = self._get_quarter_data(df, 'DailyPeakWindDirection', quarter)
-        # Fit and sample
+
         mu_s, sd_s = norm.fit(speeds)
         mu_d, sd_d = norm.fit(dirs)
+        #Reference : Used the help of ChatGPT to devise the logic for wind direction grid computation implementation
         speed_grid = np.clip(norm.rvs(mu_s, sd_s, size=(self.grid_size, self.grid_size)), 0, None)
         dir_grid = np.mod(norm.rvs(mu_d, sd_d, size=(self.grid_size, self.grid_size)), 360)
-        # Cache for reuse
+
         np.save('wind_speed_grid_25x25.npy', speed_grid)
         np.save('wind_dir_grid_25x25.npy', dir_grid)
 
@@ -268,7 +269,6 @@ class EnvironmentalFactors:
                 try:
                     lat, lon, pct = row['latitude'], row['longitude'], row['percentage']
                     if lon > 180: lon -= 360
-                    # Optionally boost DenseShrub
                     if veg=='DenseShrub' and hypothesis_dense_shrub:
                         pct = min(pct*2.5, 100)
                     i = np.digitize(lat, self.lat_grid)-1

@@ -50,6 +50,8 @@ Simulation Model
     
     2. NASA FIRMS - https://firms.modaps.eosdis.nasa.gov
 
+    3. Data Link : https://drive.google.com/drive/folders/138FxLgycWRDPRQCPdAqJ7gmZvtycBxvd?usp=sharing (Raw Climate Data and NASA FIRMS data can be found here.)
+
 ## Monte Carlo Simulations
 
 •	Parallel Processing: Employs multiprocessing to run multiple simulations concurrently.

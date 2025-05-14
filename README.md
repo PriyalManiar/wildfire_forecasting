@@ -42,12 +42,29 @@ Simulation Model
 
 Three hypotheses were tested:
 
-1.	High Humidity: Increased minimum humidity levels across the grid.
-	
-2.	High Wind Speed: Tripled wind speed values to assess impact on fire spread.
-	
-3.	Dense Shrub Vegetation: Increased ignition probability for dense shrub areas.
-	
+1. *High Humidity*
+
+Hypothesis Statement: Increased atmospheric humidity levels reduce wildfire spread by lowering the probability of ignition and propagation.
+
+Null Hypothesis (H0): There is no significant difference in the final burned area between the control simulations and the simulations with increased minimum humidity levels (65 percent or higher) across the grid.
+
+Alternative Hypothesis (H1): The final burned area is significantly lower in simulations with increased minimum humidity levels (65 percent or higher) compared to the control simulations.
+
+2. *High Wind Speed*
+
+Hypothesis Statement: Higher wind speeds accelerate wildfire spread by increasing the probability of ignition in neighboring cells.
+
+Null Hypothesis (H0): There is no significant difference in the final burned area between the control simulations and the simulations with wind speed values tripled.
+
+Alternative Hypothesis (H1): The final burned area is significantly higher in simulations with tripled wind speed values compared to the control simulations.
+
+3.*Dense Shrub Vegetation*
+
+Hypothesis Statement: Higher shrub density increases wildfire ignition likelihood and total spread due to greater fuel availability.
+
+Null Hypothesis (H0): There is no significant difference in the final burned area between the control simulations and the simulations with increased ignition probabilities for dense shrub vegetation (boosted by a factor of 2.5).
+
+Alternative Hypothesis (H1): The final burned area is significantly higher in simulations with increased ignition probabilities for dense shrub vegetation compared to the control simulations.
 
 Statistical analyses, including t-tests, were conducted to compare the outcomes of these scenarios against the control simulations.
 

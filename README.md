@@ -1,11 +1,11 @@
-**Enhancing Wildfire Forecasting with Monte Carlo Simulations**
+# Enhancing Wildfire Forecasting with Monte Carlo Simulations
 
 
-**Overview**
+## Overview
 
 This project simulates wildfire spread over a geographic grid using environmental data and historical fire occurrences data. It aims to model fire dynamics under varying conditions and assess the impact of specific environmental factors through hypothesis testing.
 
-**Objectives**
+## Objectives
 
 •	Develop a realistic wildfire spread model incorporating environmental variables.
 
@@ -13,9 +13,9 @@ This project simulates wildfire spread over a geographic grid using environmenta
 
 •	Test hypotheses related to environmental influences on wildfire spread.
 
-**Methodology**
+## Methodology
 
-_Data Preparation_
+# Data Preparation
 
 •	Ignition Points: Derived from NASA FIRMS dataset to identify high-frequency fire locations. ( 2012-2025)
 
@@ -32,17 +32,17 @@ Simulation Model
 
 •	Time Evolution: Simulates fire spread over discrete time steps, updating environmental conditions dynamically.
 
-**Monte Carlo Simulations**
+## Monte Carlo Simulations
 
 •	Parallel Processing: Employs multiprocessing to run multiple simulations concurrently.
 
 •	Convergence Analysis: Uses moving averages and relative change metrics to assess simulation stability.
 
-**Hypothesis Testing**
+## Hypothesis Testing
 
 Three hypotheses were tested:
 
-1. *High Humidity*
+1. # High Humidity
 
 Hypothesis Statement: Increased atmospheric humidity levels reduce wildfire spread by lowering the probability of ignition and propagation.
 
@@ -50,7 +50,7 @@ Null Hypothesis (H0): There is no significant difference in the final burned are
 
 Alternative Hypothesis (H1): The final burned area is significantly lower in simulations with increased minimum humidity levels (65 percent or higher) compared to the control simulations.
 
-2. *High Wind Speed*
+2. # High Wind Speed
 
 Hypothesis Statement: Higher wind speeds accelerate wildfire spread by increasing the probability of ignition in neighboring cells.
 
@@ -58,7 +58,7 @@ Null Hypothesis (H0): There is no significant difference in the final burned are
 
 Alternative Hypothesis (H1): The final burned area is significantly higher in simulations with tripled wind speed values compared to the control simulations.
 
-3.*Dense Shrub Vegetation*
+3.# Dense Shrub Vegetation
 
 Hypothesis Statement: Higher shrub density increases wildfire ignition likelihood and total spread due to greater fuel availability.
 
@@ -68,7 +68,7 @@ Alternative Hypothesis (H1): The final burned area is significantly higher in si
 
 Statistical analyses, including t-tests, were conducted to compare the outcomes of these scenarios against the control simulations.
 
-**Key Features**
+## Key Features
 
 •	Numba Integration: Accelerates computation of spread probabilities through just-in-time compilation.
 
@@ -78,7 +78,7 @@ Statistical analyses, including t-tests, were conducted to compare the outcomes 
 
 •	Visualization Tools: Generates plots for burned area over time, convergence behavior, and distribution comparisons.
 
-**Limitations**
+## Limitations
 
 •	Grid Resolution: The 25x25 grid may not capture finer-scale fire dynamics.
 

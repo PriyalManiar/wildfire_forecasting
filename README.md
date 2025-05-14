@@ -1,5 +1,6 @@
 # Enhancing Wildfire Forecasting with Monte Carlo Simulations
 
+### Team Members: Aditi Shukla and Priyal Maniar
 ## Overview
 This project simulates wildfire spread over a geographic grid(San diego County)using real environmental data and historical fire occurrences data. It aims to model fire dynamics under varying conditions and assess the impact of specific environmental factors through hypothesis testing.
 
@@ -15,10 +16,14 @@ This project simulates wildfire spread over a geographic grid(San diego County)u
 - **Environmental Grids**: Generated for elevation, wind speed and direction, humidity, temperature, and vegetation types
 
 #### Environmental Grids Visualization
-![Quarterly Humidity Grid](quarterly_humidity_grid.png)
-![Quarterly Temperature Grid](quarterly_temperature_grid.png)
-![Quarterly Wind Speed Grid](quarterly_wind_speed_grid.png)
-![Elevation Grid](elevation_grid.png)
+<img width="375" alt="quarterly_temperature_grid" src="https://github.com/user-attachments/assets/44cf81bb-d270-4661-a371-91e4d2972a23" />
+
+<img width="375" alt="quarterly_humidity_grid" src="https://github.com/user-attachments/assets/a663ca86-7fc0-4d55-90be-70241beed387" />
+
+<img width="375" alt="quarterly_wind_speed_grid" src="https://github.com/user-attachments/assets/8cdd4c1e-9c5b-4d93-ac26-8a682e7442a6" />
+
+<img width="375" alt="elevation_grid" src="https://github.com/user-attachments/assets/82a4f117-8b3d-4ceb-826e-39f743ac407e" />
+
 
 #### Data Sources
 1. **Elevation Data**: OpenTopography API

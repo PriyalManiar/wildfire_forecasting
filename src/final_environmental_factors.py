@@ -9,8 +9,8 @@ from scipy.stats import norm
 
 class EnvironmentalFactors:
     """
-    Encapsulates methods to generate environmental grids (elevation, wind, humidity,
-    vegetation ignition probability, and temperature) for a given geographic area and season.
+    Defines methods to generate environmental grids - elevation, wind, humidity,
+    vegetation ignition probability, and temperature) for a given geographic area and quarter.
     """
     # Shared class variables to cache grids if needed
     _elevation_grid = None
@@ -24,15 +24,17 @@ class EnvironmentalFactors:
         min_lon=-117.6,
         max_lon=-116.1,
         dataset="etopo1"
-    ):
+    )-> None:
         """
         Initialize geographic bounds and grid resolution.
 
-        Parameters:
-            grid_size (int): Number of cells per side of the square grid.
-            min_lat, max_lat (float): Latitude limits of the grid.
-            min_lon, max_lon (float): Longitude limits of the grid.
-            dataset (str): Elevation dataset name for API (default 'etopo1').
+        :param grid_size: Number of grid points along each dimension.
+        :param min_lat: Minimum latitude.
+        :param max_lat: Maximum latitude.
+        :param min_lon: Minimum longitude.
+        :param max_lon: Maximum longitude.
+        :param dataset: Dataset identifier for elevation data source.
+
         """
         self.grid_size = grid_size
         self.min_lat = min_lat
@@ -46,31 +48,23 @@ class EnvironmentalFactors:
         # Randomly pick a quarterly season for climate data
         self.quarter = self._select_random_quarter()
 
-    def _select_random_quarter(self):
+    def _select_random_quarter(self)-> str:
         """
-        Choose one of Q1, Q2, Q3, Q4 at random.
+        Randomly selects one of the 4 quarters : Q1, Q2, Q3, Q4
 
-        Returns:
-            (str) Quarter identifier.
+        :return: A string representing the randomly selected quarter.
         """
         return f'Q{np.random.randint(1, 5)}'
 
-    def _get_quarter_data(self, df, column, quarter):
+    def _get_quarter_data(self, df: pd.DataFrame, column:str, quarter:str)->np.ndarray:
         """
         Extract numeric values for a given quarter from a DataFrame.
 
-        Filters out non-numeric entries and missing data.
+        :param df: Pandas DataFrame containing the data.
+        :param column: Name of the column to extract data from.
+        :param quarter: Name of the quarter to extract data from.
+        :return: Numpy array of numeric quarter values
 
-        Parameters:
-            df (pd.DataFrame): Source data with 'Quarter' column.
-            column (str): Column to extract values from.
-            quarter (str): Quarter identifier, e.g. 'Q2'.
-
-        Returns:
-            (np.ndarray) Array of valid numeric values for that quarter.
-
-        Raises:
-            ValueError: If no valid data found.
         """
         # Select rows matching the quarter
         quarter_data = df[df['Quarter'] == quarter][column].astype(str)
@@ -82,14 +76,11 @@ class EnvironmentalFactors:
             raise ValueError(f"No valid data for quarter {quarter} in column {column}")
         return values
 
-    def generate_elevation_grid(self):
+    def generate_elevation_grid(self)-> np.ndarray:
         """
-        Build or load a high-resolution elevation grid using an external API.
+        Generate and load an elevation grid for the selected region using an API call
 
-        Caches to 'elevation_grid_25x25.npy' after first run.
-
-        Returns:
-            (np.ndarray) 2D array of elevations (meters).
+        ":return: 2D Numpy array of elevation values
         """
         npy_file = 'elevation_grid_25x25.npy'
         # If we saved it before, just load
@@ -135,18 +126,14 @@ class EnvironmentalFactors:
         plt.close()
         return arr
 
-    def generate_wind_grids(self, quarter, csv_path='climate.csv'):
+    def generate_wind_grids(self, quarter:str, csv_path:str='climate.csv')-> tuple[np.ndarray, np.ndarray]:
         """
         Create wind speed and direction grids for the selected quarter.
 
-        Fits normal distributions to historical values and samples a full grid.
+        :param quarter: Name of the quarter to extract data from.
+        :param csv_path: Path to the csv file.
+        :return: Tuple 2 numpy arrays : wind speed grid (in m/s) and wind direction grid (in degrees)
 
-        Parameters:
-            quarter (str): e.g. 'Q3'.
-            csv_path (str): Path to climate CSV with wind data.
-
-        Returns:
-            (np.ndarray, np.ndarray): speed_grid (m/s), direction_grid (degrees).
         """
         df = pd.read_csv(csv_path)
         # Extract raw values for stats
@@ -162,14 +149,13 @@ class EnvironmentalFactors:
         np.save('wind_dir_grid_25x25.npy', dir_grid)
         return speed_grid, dir_grid
 
-    def generate_humidity_grid(self, quarter, csv_path='climate.csv'):
+    def generate_humidity_grid(self, quarter:str, csv_path:str='climate.csv')-> np.ndarray:
         """
-        Build a humidity grid for the selected quarter.
+        Generate a grid of humidity levels for the selected quarter.
 
-        Samples from a normal fit to historical humidity values.
-
-        Returns:
-            (np.ndarray) 2D array of relative humidity (%).
+        :param quarter: Name of the quarter to extract data from.
+        :param csv_path: Path to the csv file for climate data
+        :return: 2D numpy arrays with humidity values
         """
         df = pd.read_csv(csv_path)
         hums = self._get_quarter_data(df, 'DailyAverageRelativeHumidity', quarter)
@@ -188,18 +174,18 @@ class EnvironmentalFactors:
 
     def generate_vegetation_ignition_grid(
         self,
-        folder='vegetation',
-        hypothesis_dense_shrub=False,
-        density_factor=1
-    ):
+        folder: str='vegetation',
+        hypothesis_dense_shrub: bool=False,
+        density_factor: float=1
+    )-> np.ndarray:
         """
-        Aggregate multiple vegetation type CSVs into an ignition probability map.
+        Generate a vegetation ignition grid for the selected quarter based on vegetation type data.
 
-        Reads each .csv in 'folder', digitizes lat/lon to grid, and weights by
-        a base ignition chance.
+        :param folder: Path to the folder where the data will be saved.
+        :param hypothesis_dense_shrub: if true, increases DenseShrub ignition probability
+        :param density_factor: Scaling factor for overall ignition probabilities
+        :return: 2D numpy arrays with vegetation ignition grid
 
-        Returns:
-            (np.ndarray) ignition_probability in [0,1].
         """
         npy_file = 'vegetation_ignition_grid_25x25.npy'
         if os.path.exists(npy_file):
@@ -245,13 +231,13 @@ class EnvironmentalFactors:
         plt.close()
         return grid
 
-    def temperature_grid(self, quarter, csv_path='climate.csv'):
+    def temperature_grid(self, quarter:str, csv_path:str='climate.csv')-> np.ndarray:
         """
-        Sample temperature for the quarter, returning a full grid.
+        Generate a temperature grid for the selected quarter based on temperature data.
 
-        Fits to 'DailyAverageDryBulbTemperature'.
-
-        Returns (np.ndarray): Temperature (°C).
+        :param quarter: Quarter to generate grid for selected quarter.
+        :param csv_path: Path to the csv file containing climate data.
+        :return: 2D numpy arrays with temperature values
         """
         df = pd.read_csv(csv_path)
         vals = self._get_quarter_data(df, 'DailyAverageDryBulbTemperature', quarter)

@@ -19,12 +19,24 @@ This project simulates wildfire spread over a geographic grid using environmenta
 
 •	Ignition Points: Derived from NASA FIRMS dataset to identify high-frequency fire locations. ( 2012-2025)
 
+
 •	Environmental Grids: Generated for elevation, wind speed and direction, humidity, temperature, and vegetation types.
 
-o	Elevation Data: OpenTopography API
+<img width="375" alt="quarterly_humidity_grid" src="https://github.com/user-attachments/assets/a9c9bde7-9234-4372-87be-47c7aa8653f7" />
 
-o	Other Environmental Variables: NOAA Website (1st Jan 2012 – 1 May 2025) for stations : Imperial Beach, San Diego International Airport, Ramona Airport and Oceanside.
+<img width="375" alt="quarterly_temperature_grid" src="https://github.com/user-attachments/assets/76fd084b-ae23-4b82-83f3-9074ba57e1ab" />
+
+<img width="375" alt="quarterly_wind_speed_grid" src="https://github.com/user-attachments/assets/39b3aa4c-3140-41de-94eb-4f79c3b65fb6" />
+
+
+<img width="375" alt="elevation_grid" src="https://github.com/user-attachments/assets/e5dc862d-9d6b-4da5-8f6e-9407104a3781" />
+
+
+a. Elevation Data- OpenTopography API
+
+b. Other Environmental Variables- NOAA Website (1st Jan 2012 – 1 May 2025) for stations : Imperial Beach, San Diego International Airport, Ramona Airport and Oceanside.
 Simulation Model
+
 
 •	Grid-Based Approach: Utilizes a 25x25 grid representing the study area.
 
@@ -32,11 +44,29 @@ Simulation Model
 
 •	Time Evolution: Simulates fire spread over discrete time steps, updating environmental conditions dynamically.
 
+• Data Source Website: (all data was requested using the order data feature on these websites)
+
+    1. NOAA - https://www.ncei.noaa.gov/cdo-web/
+    
+    2. NASA FIRMS - https://firms.modaps.eosdis.nasa.gov
+
 ## Monte Carlo Simulations
 
 •	Parallel Processing: Employs multiprocessing to run multiple simulations concurrently.
 
 •	Convergence Analysis: Uses moving averages and relative change metrics to assess simulation stability.
+
+## Control Experiment
+
+The control experiment establishes the baseline behavior of the wildfire spread simulation under standard environmental conditions. It uses ignition points derived from the NASA FIRMS dataset and generates environmental grids for elevation, wind speed and direction, temperature, humidity, and vegetation ignition probabilities without any modifications related to the tested hypotheses.
+
+The wildfire spread is simulated over a 25 by 25 grid. Spread probabilities are calculated at each time step based on conditions including vegetation type, wind influence, elevation gradient, temperature, and humidity. The simulation proceeds iteratively until convergence is detected based on a relative change threshold in burned area over successive iterations. Convergence is considered achieved when the relative change in burned area remains below 1 percent over the last five time steps.
+
+For the control case, average values are chosen for the environmental conditions. Wind speed, humidity, temperature, and vegetation parameters are sampled from historical distributions and represent average quarterly conditions. 
+
+The control experiment is run for independent Monte Carlo simulations, 1200 runs to ensure statistical stability. The control results provide a reference for the final burned areas, which is later used to evaluate the effects of environmental changes introduced under the hypothesis testing scenarios.
+
+
 
 ## Hypothesis Testing
 
@@ -72,7 +102,7 @@ Statistical analyses, including t-tests, were conducted to compare the outcomes 
 
 •	Numba Integration: Accelerates computation of spread probabilities through just-in-time compilation.
 
-•	Parallel Execution: Enhances simulation throughput using Python's multiprocessing capabilities.
+•	Parallel Processing: Enhances simulation throughput using Python's multiprocessing capabilities.
 
 •	Statistical Analysis: Provides quantitative assessment of hypothesis impacts on fire spread.
 

@@ -225,7 +225,7 @@ class EnvironmentalFactors:
                     if lon > 180: lon -= 360
                     # Optionally boost DenseShrub
                     if veg=='DenseShrub' and hypothesis_dense_shrub:
-                        pct = min(pct*1.1, 100)
+                        pct = min(pct*2.5, 100)
                     i = np.digitize(lat, self.lat_grid)-1
                     j = np.digitize(lon, self.lon_grid)-1
                     if 0 <= i < self.grid_size and 0 <= j < self.grid_size:

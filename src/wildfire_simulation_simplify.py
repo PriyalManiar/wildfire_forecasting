@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import random
 from environmental_factors import EnvironmentalFactors
 from multiprocessing import Pool, cpu_count
 from numba import jit, float64, int64, boolean
-from scipy.stats import norm
+from scipy.stats import norm,ttest_ind
 
 @jit(nopython=True)
 def calculate_spread_probabilities(
@@ -48,12 +49,12 @@ def calculate_spread_probabilities(
                             # Apply wind influence and humidity factor
                             prob *= wind_influence
                             prob *= max(0, 1 - humidity[ni, nj] / 100)
-                            spread_prob[ni, nj] = max(prob, 0.20)
+                            spread_prob[ni, nj] = max(prob, 0.20) #Reduced it from 0.20 to 0.1
     
     return spread_prob
 
 class WildfireSimulation:
-    def __init__(self, grid_size=25, max_time_steps=24, convergence_threshold=0.01, hypothesis_dense_shrub=False):
+    def __init__(self, grid_size=25, max_time_steps=24, convergence_threshold=0.01, hypothesis= False):
         """
         Initialize wildfire simulation.
         max_time_steps: Maximum number of time steps (e.g., hours) to simulate
@@ -61,13 +62,16 @@ class WildfireSimulation:
         self.grid_size = grid_size
         self.max_time_steps = max_time_steps
         self.convergence_threshold = convergence_threshold
+        self.hypothesis = hypothesis
         self.env = EnvironmentalFactors(grid_size)
         
         # Generate static grids once
         self.elevation = self.env.generate_elevation_grid()
-        self.vegetation = self.env.generate_vegetation_ignition_grid(density_factor=3, hypothesis_dense_shrub=hypothesis_dense_shrub)
+        dense_shrub_flag = True if self.hypothesis == 'dense_shrub' else False
+        self.vegetation = self.env.generate_vegetation_ignition_grid(density_factor=3,hypothesis_dense_shrub=dense_shrub_flag)
         self.ignition_points = np.load('fire_frequent_cells_25x25_southeast_us.npy')
-        
+
+
         # Initialize fire grid
         self.fire_grid = np.zeros((grid_size, grid_size))
         self.burned_areas = []
@@ -91,7 +95,10 @@ class WildfireSimulation:
         self.humidity = (self.weather_persistence * self.humidity + 
                         self.weather_variability * np.random.normal(50, 10, self.humidity.shape))
         self.humidity = np.clip(self.humidity, 0, 100)
-        
+
+        if self.hypothesis == 'high_humidity':
+            self.humidity = np.maximum(self.humidity, 65)
+
         self.temperature = (self.weather_persistence * self.temperature + 
                           self.weather_variability * np.random.normal(25, 5, self.temperature.shape))
         
@@ -103,6 +110,9 @@ class WildfireSimulation:
         self.wind_speed = (self.weather_persistence * self.wind_speed + 
                           self.weather_variability * np.random.normal(10, 3, self.wind_speed.shape))
         self.wind_speed = np.clip(self.wind_speed, 0, None)
+
+        if self.hypothesis == 'high_wind':
+            self.wind_speed *= 3.0
 
     def simulate_spread(self):
         """Simulate fire spread over time."""
@@ -217,7 +227,7 @@ def plot_monte_carlo_convergence(percentages, ma, window=20, path='mc_convergenc
     plt.savefig(path)
     plt.close()
 
-def run_single_simulation(args):
+def run_single_simulation(hypothesis):
     """Run a single simulation and return its results."""
     sim = WildfireSimulation()
     _, burned = sim.simulate_spread()
@@ -226,7 +236,7 @@ def run_single_simulation(args):
     burned_pct = 100 * burned_cells / total_cells
     return (burned_cells, len(burned)-1, burned_pct)
 
-def run_simulation(n_runs=2000, mc_window=20, mc_last_n=10, mc_threshold=0.05):
+def run_simulation(n_runs=2000, hypothesis= None, mc_window=20, mc_last_n=10, mc_threshold=0.05):
     # Use number of CPU cores minus 1 to leave one core free
     n_cores = max(1, cpu_count() - 1)
     print(f"Running {n_runs} simulations using {n_cores} CPU cores...")
@@ -290,6 +300,78 @@ def run_simulation(n_runs=2000, mc_window=20, mc_last_n=10, mc_threshold=0.05):
     # Plot MC convergence
     plot_monte_carlo_convergence(percentages, ma, window=mc_window)
 
+    return list(zip(areas, iterations, percentages))
+
+def plot_cumulative_convergence(percentages, path='cumulative_convergence.png'):
+    """
+    Plot cumulative mean and ±1 standard error bands over simulation runs.
+    """
+    n = len(percentages)
+    pct = np.array(percentages)
+    cum_mean = np.cumsum(pct) / (np.arange(1, n+1))
+    cum_std = np.array([pct[:i].std() for i in range(1, n+1)])
+    cum_se = cum_std / np.sqrt(np.arange(1, n+1))
+    plt.axhline(np.mean(percentages), color='red', linestyle='-', label='Final Mean')
+    plt.plot(cum_mean, label='Cumulative Mean')
+    plt.fill_between(
+        np.arange(n),
+        cum_mean - cum_se,
+        cum_mean + cum_se,
+        alpha=0.2,
+        label='±1 SE'
+    )
+    plt.xlabel('Run Index')
+    plt.ylabel('Burned Area (%)')
+    plt.title('Cumulative Convergence')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(path)
+    plt.close()
+
+def hypothesis_testing(control_results, hypothesis_results, hypothesis_name=""):
+    control_burned = [res[2] for res in control_results]
+    hypothesis_burned = [res[2] for res in hypothesis_results]
+
+    plt.figure(figsize=(10, 6))
+    sns.histplot(control_burned, color='blue', label='Baseline', kde=True, stat="density", bins=30)
+    sns.histplot(hypothesis_burned, color='red', label=hypothesis_name, kde=True, stat="density", bins=30, alpha=0.6)
+    plt.title(f'Comparison of Burned Area %\nBaseline vs {hypothesis_name}')
+    plt.xlabel('Final Burned Area %')
+    plt.ylabel('Density')
+    plt.legend()
+    plt.grid(True)
+    filename = f"control_vs_{hypothesis_name}_burned_area_comparison.png"
+    plt.savefig(filename)
+
+    t_stat, p_value = ttest_ind(control_burned, hypothesis_burned, equal_var=False)
+
+    print(f"\nStatistical Comparison: Control vs {hypothesis_name}")
+    print(f"T-statistic = {t_stat:.3f}, P-value = {p_value:.5f}")
+
+    if p_value < 0.05:
+        print(f"Result: Significant difference detected at 95% confidence level.")
+    else:
+        print(f"Result: No significant difference detected at 95% confidence level.")
 
 if __name__ == "__main__":
-    run_simulation(n_runs=2000)  # Increased number of runs for better convergence
+    #Control Experiment
+    print("Running Control Simulation")
+    control_results = run_simulation(n_runs=1500, hypothesis=None) # Increased number of runs for better convergence
+
+    # Hypothesis 1: High humidity
+    print("\nRunning Hypothesis 1 Simulation")
+    humidity_results = run_simulation(n_runs=1500, hypothesis='high_humidity')
+
+    # Hypothesis 2: High Wind
+    print("\nRunning Hypothesis 2 Simulation")
+    wind_results = run_simulation(n_runs=1500, hypothesis='high_wind')
+
+    # Hypothesis 3: Dense shrub
+    print("\nRunning Hypothesis 3 Simulation")
+    shrub_results = run_simulation(n_runs=1500, hypothesis='dense_shrub')
+
+    # Validation (comparison between baseline and each hypothesis)
+    hypothesis_testing(control_results, humidity_results, hypothesis_name='High Humidity')
+    hypothesis_testing(control_results, wind_results, hypothesis_name='High Wind')
+    hypothesis_testing(control_results, shrub_results, hypothesis_name='Dense Shrub')
+

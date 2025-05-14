@@ -227,13 +227,12 @@ class WildfireSimulation:
             burned_area = np.sum(self.fire_grid == 2)
             self.burned_areas.append(burned_area)
 
-            if not self.hypothesis:
-                rel_change = abs(self.burned_areas[-1] - self.burned_areas[-2]) / max(1, self.burned_areas[-2])
-                recent_changes.append(rel_change)
-                if len(recent_changes) > k:
-                    recent_changes.pop(0)
-                if len(recent_changes) == k and all(c < self.convergence_threshold for c in recent_changes):
-                    break
+            rel_change = abs(self.burned_areas[-1] - self.burned_areas[-2]) / max(1, self.burned_areas[-2])
+            recent_changes.append(rel_change)
+            if len(recent_changes) > k:
+                recent_changes.pop(0)
+            if len(recent_changes) == k and all(c < self.convergence_threshold for c in recent_changes):
+                break
 
         return self.fire_grid, self.burned_areas
 

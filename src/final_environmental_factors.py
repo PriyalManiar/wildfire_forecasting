@@ -173,7 +173,7 @@ class EnvironmentalFactors:
 
         mu_s, sd_s = norm.fit(speeds)
         mu_d, sd_d = norm.fit(dirs)
-        #Reference : Used the help of ChatGPT to devise the logic for wind direction grid computation implementation
+
         speed_grid = np.clip(norm.rvs(mu_s, sd_s, size=(self.grid_size, self.grid_size)), 0, None)
         dir_grid = np.mod(norm.rvs(mu_d, sd_d, size=(self.grid_size, self.grid_size)), 360)
 

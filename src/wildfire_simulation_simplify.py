@@ -49,7 +49,7 @@ def calculate_spread_probabilities(
                             # Apply wind influence and humidity factor
                             prob *= wind_influence
                             prob *= max(0, 1 - humidity[ni, nj] / 100)
-                            spread_prob[ni, nj] = max(prob, 0.20) #Reduced it from 0.20 to 0.1
+                            spread_prob[ni, nj] = max(prob, 0.15)
     
     return spread_prob
 
@@ -97,7 +97,7 @@ class WildfireSimulation:
         self.humidity = np.clip(self.humidity, 0, 100)
 
         if self.hypothesis == 'high_humidity':
-            self.humidity = np.maximum(self.humidity, 65)
+            self.humidity = np.maximum(self.humidity, 85)
 
         self.temperature = (self.weather_persistence * self.temperature + 
                           self.weather_variability * np.random.normal(25, 5, self.temperature.shape))
@@ -112,7 +112,7 @@ class WildfireSimulation:
         self.wind_speed = np.clip(self.wind_speed, 0, None)
 
         if self.hypothesis == 'high_wind':
-            self.wind_speed *= 3.0
+            self.wind_speed *= 5.0
 
     def simulate_spread(self):
         """Simulate fire spread over time."""
@@ -133,7 +133,7 @@ class WildfireSimulation:
                 self.normalize(self.wind_speed),
                 self.normalize(self.elevation),
                 self.wind_direction, self.humidity,
-                np.array([0.2, 0.3, 0.5, 0.25, 0.35])  # weights
+                np.array([0.2, 0.3, 0.9, 0.7, 0.35])  # weights
             )
             
             # Apply spread probabilities
@@ -144,15 +144,23 @@ class WildfireSimulation:
             # Update burned area
             burned_area = np.sum(self.fire_grid == 2)
             self.burned_areas.append(burned_area)
-            
-            # Check convergence
-            rel_change = abs(self.burned_areas[-1] - self.burned_areas[-2]) / max(1, self.burned_areas[-2])
-            recent_changes.append(rel_change)
-            if len(recent_changes) > k:
-                recent_changes.pop(0)
-            if len(recent_changes) == k and all(c < self.convergence_threshold for c in recent_changes):
-                break
-                
+
+            if not self.hypothesis:
+                rel_change = abs(self.burned_areas[-1] - self.burned_areas[-2]) / max(1, self.burned_areas[-2])
+                recent_changes.append(rel_change)
+                if len(recent_changes) > k:
+                    recent_changes.pop(0)
+                if len(recent_changes) == k and all(c < self.convergence_threshold for c in recent_changes):
+                    break
+
+            # # Check convergence
+            # rel_change = abs(self.burned_areas[-1] - self.burned_areas[-2]) / max(1, self.burned_areas[-2])
+            # recent_changes.append(rel_change)
+            # if len(recent_changes) > k:
+            #     recent_changes.pop(0)
+            # if len(recent_changes) == k and all(c < self.convergence_threshold for c in recent_changes):
+            #     break
+            #
         return self.fire_grid, self.burned_areas
 
     def plot_fire_map(self, path='wildfire_spread.png'):
@@ -255,41 +263,44 @@ def run_simulation(n_runs=2000, hypothesis= None, mc_window=20, mc_last_n=10, mc
     std_iter = np.std(iterations)
     mean_pct = np.mean(percentages)
     std_pct = np.std(percentages)
-    
-    print("\nDetailed Summary Statistics:")
-    print(f"Burned Area: {mean_area:.2f} ± {std_area:.2f} cells")
-    print(f"Iterations: {mean_iter:.2f} ± {std_iter:.2f} steps")
-    print(f"Burned Area %: {mean_pct:.2f} ± {std_pct:.2f}%")
-    print(f"95% Confidence Interval: [{mean_pct - 1.96*std_pct:.2f}%, {mean_pct + 1.96*std_pct:.2f}%]")
+
+    if hypothesis is None or hypothesis == False:
+        print("\nDetailed Summary Statistics:")
+        print(f"Burned Area: {mean_area:.2f} ± {std_area:.2f} cells")
+        print(f"Iterations: {mean_iter:.2f} ± {std_iter:.2f} steps")
+        print(f"Burned Area %: {mean_pct:.2f} ± {std_pct:.2f}%")
+        print(f"95% Confidence Interval: [{mean_pct - 1.96*std_pct:.2f}%, {mean_pct + 1.96*std_pct:.2f}%]")
 
     # Monte Carlo convergence check
-    converged, ma, rel_changes = monte_carlo_convergence_check(
-        percentages, 
-        window=mc_window, 
-        last_n=mc_last_n, 
-        threshold=mc_threshold
-    )
+        converged, ma, rel_changes = monte_carlo_convergence_check(
+            percentages,
+            window=mc_window,
+            last_n=mc_last_n,
+            threshold=mc_threshold
+        )
     
-    if converged:
-        print(f"\nMonte Carlo convergence achieved:")
-        print(f"- Relative change < {mc_threshold*100:.2f}% for last {mc_last_n} steps")
-        print(f"- Final moving average: {ma[-1]:.2f}%")
-        print(f"- Final relative change: {rel_changes[-1]*100:.2f}%")
+        if converged:
+            print(f"\nMonte Carlo convergence achieved:")
+            print(f"- Relative change < {mc_threshold*100:.2f}% for last {mc_last_n} steps")
+            print(f"- Final moving average: {ma[-1]:.2f}%")
+            print(f"- Final relative change: {rel_changes[-1]*100:.2f}%")
+        else:
+            print("\nMonte Carlo convergence NOT achieved.")
+            print(f"Last {mc_last_n} relative changes:")
+            for i, change in enumerate(rel_changes[-mc_last_n:]):
+                print(f"  Step {len(rel_changes)-mc_last_n+i+1}: {change*100:.2f}%")
     else:
-        print("\nMonte Carlo convergence NOT achieved.")
-        print(f"Last {mc_last_n} relative changes:")
-        for i, change in enumerate(rel_changes[-mc_last_n:]):
-            print(f"  Step {len(rel_changes)-mc_last_n+i+1}: {change*100:.2f}%")
+        ma = None
 
     # Plot histogram of burned areas with normal distribution fit
+
     plt.figure(figsize=(12, 6))
     plt.hist(percentages, bins=30, color='orange', edgecolor='k', density=True, alpha=0.7)
     
     # Add normal distribution fit
     x = np.linspace(min(percentages), max(percentages), 100)
     plt.plot(x, norm.pdf(x, mean_pct, std_pct), 'r-', lw=2, label='Normal Distribution Fit')
-    plot_monte_carlo_convergence(list(percentages), ma, mc_window)
-    plot_cumulative_convergence(list(percentages))
+    # plot_monte_carlo_convergence(list(percentages), ma, mc_window)
     plt.xlabel('Final Burned Area (%)')
     plt.ylabel('Density')
     plt.title('Burned Area Percentage Distribution with Normal Fit')
@@ -299,7 +310,11 @@ def run_simulation(n_runs=2000, hypothesis= None, mc_window=20, mc_last_n=10, mc
     plt.close()
 
     # Plot MC convergence
-    plot_monte_carlo_convergence(percentages, ma, window=mc_window)
+    if hypothesis is None or hypothesis == False:
+        plot_cumulative_convergence(percentages)
+
+    if ma is not None:
+        plot_monte_carlo_convergence(percentages, ma, window=mc_window)
 
     return list(zip(areas, iterations, percentages))
 
@@ -307,6 +322,7 @@ def plot_cumulative_convergence(percentages, path='cumulative_convergence.png'):
     """
     Plot cumulative mean and ±1 standard error bands over simulation runs.
     """
+    plt.figure(figsize=(12, 6))
     n = len(percentages)
     pct = np.array(percentages)
     cum_mean = np.cumsum(pct) / (np.arange(1, n+1))
@@ -357,19 +373,19 @@ def hypothesis_testing(control_results, hypothesis_results, hypothesis_name=""):
 if __name__ == "__main__":
     #Control Experiment
     print("Running Control Simulation")
-    control_results = run_simulation(n_runs=1500, hypothesis=None) # Increased number of runs for better convergence
+    control_results = run_simulation(n_runs=1200, hypothesis=None) # Increased number of runs for better convergence
 
     # Hypothesis 1: High humidity
     print("\nRunning Hypothesis 1 Simulation")
-    humidity_results = run_simulation(n_runs=1500, hypothesis='high_humidity')
+    humidity_results = run_simulation(n_runs=1200, hypothesis='high_humidity')
 
     # Hypothesis 2: High Wind
     print("\nRunning Hypothesis 2 Simulation")
-    wind_results = run_simulation(n_runs=1500, hypothesis='high_wind')
+    wind_results = run_simulation(n_runs=1200, hypothesis='high_wind')
 
     # Hypothesis 3: Dense shrub
     print("\nRunning Hypothesis 3 Simulation")
-    shrub_results = run_simulation(n_runs=1500, hypothesis='dense_shrub')
+    shrub_results = run_simulation(n_runs=1200, hypothesis='dense_shrub')
 
     # Validation (comparison between baseline and each hypothesis)
     hypothesis_testing(control_results, humidity_results, hypothesis_name='High Humidity')

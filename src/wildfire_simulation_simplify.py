@@ -288,7 +288,8 @@ def run_simulation(n_runs=2000, hypothesis= None, mc_window=20, mc_last_n=10, mc
     # Add normal distribution fit
     x = np.linspace(min(percentages), max(percentages), 100)
     plt.plot(x, norm.pdf(x, mean_pct, std_pct), 'r-', lw=2, label='Normal Distribution Fit')
-    
+    plot_monte_carlo_convergence(list(percentages), ma, mc_window)
+    plot_cumulative_convergence(list(percentages))
     plt.xlabel('Final Burned Area (%)')
     plt.ylabel('Density')
     plt.title('Burned Area Percentage Distribution with Normal Fit')

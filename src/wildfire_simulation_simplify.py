@@ -455,17 +455,6 @@ def hypothesis_testing(control_results: list[tuple[int, int,float]], hypothesis_
     control_burned = [res[2] for res in control_results]
     hypothesis_burned = [res[2] for res in hypothesis_results]
 
-    plt.figure(figsize=(10, 6))
-    sns.histplot(control_burned, color='blue', label='Baseline', kde=True, stat="density", bins=30)
-    sns.histplot(hypothesis_burned, color='red', label=hypothesis_name, kde=True, stat="density", bins=30, alpha=0.6)
-    plt.title(f'Comparison of Burned Area %\nBaseline vs {hypothesis_name}')
-    plt.xlabel('Final Burned Area %')
-    plt.ylabel('Density')
-    plt.legend()
-    plt.grid(True)
-    filename = f"control_vs_{hypothesis_name}_burned_area_comparison.png"
-    plt.savefig(filename)
-
     t_stat, p_value = ttest_ind(control_burned, hypothesis_burned, equal_var=False)
 
     print(f"\nStatistical Comparison: Control vs {hypothesis_name}")

@@ -1,119 +1,191 @@
 # Enhancing Wildfire Forecasting with Monte Carlo Simulations
 
-
 ## Overview
-
-This project simulates wildfire spread over a geographic grid using environmental data and historical fire occurrences data. It aims to model fire dynamics under varying conditions and assess the impact of specific environmental factors through hypothesis testing.
+This project simulates wildfire spread over a geographic grid(San diego County)using real environmental data and historical fire occurrences data. It aims to model fire dynamics under varying conditions and assess the impact of specific environmental factors through hypothesis testing.
 
 ## Objectives
-
-•	Develop a realistic wildfire spread model incorporating environmental variables.
-
-•	Implement Monte Carlo simulations to analyze fire behavior under stochastic conditions.
-
-•	Test hypotheses related to environmental influences on wildfire spread.
+- Develop a realistic wildfire spread model incorporating environmental variables
+- Implement Monte Carlo simulations to analyze fire behavior under stochastic conditions
+- Test hypotheses related to environmental influences on wildfire spread
 
 ## Methodology
 
 ### Data Preparation
+- **Ignition Points**: Derived from NASA FIRMS dataset to identify high-frequency fire locations (2012-2025)
+- **Environmental Grids**: Generated for elevation, wind speed and direction, humidity, temperature, and vegetation types
 
-•	Ignition Points: Derived from NASA FIRMS dataset to identify high-frequency fire locations. ( 2012-2025)
+#### Environmental Grids Visualization
+![Quarterly Humidity Grid](quarterly_humidity_grid.png)
+![Quarterly Temperature Grid](quarterly_temperature_grid.png)
+![Quarterly Wind Speed Grid](quarterly_wind_speed_grid.png)
+![Elevation Grid](elevation_grid.png)
 
+#### Data Sources
+1. **Elevation Data**: OpenTopography API
+2. **Environmental Variables**: NOAA Website (1st Jan 2012 – 1 May 2025) for stations:
+   - Imperial Beach
+   - San Diego International Airport
+   - Ramona Airport
+   - Oceanside
 
-•	Environmental Grids: Generated for elevation, wind speed and direction, humidity, temperature, and vegetation types.
+### Simulation Model
+- **Grid-Based Approach**: Utilizes a 25x25 grid representing the study area
+- **Spread Probability**: Calculated based on local environmental conditions and neighboring cell states
+- **Time Evolution**: Simulates fire spread over discrete time steps, updating environmental conditions dynamically
 
-<img width="375" alt="quarterly_humidity_grid" src="https://github.com/user-attachments/assets/a9c9bde7-9234-4372-87be-47c7aa8653f7" />
+### Data Source Websites
+1. NOAA - https://www.ncei.noaa.gov/cdo-web/
+2. NASA FIRMS - https://firms.modaps.eosdis.nasa.gov
+3. Raw Data: https://drive.google.com/drive/folders/138FxLgycWRDPRQCPdAqJ7gmZvtycBxvd?usp=sharing
 
-<img width="375" alt="quarterly_temperature_grid" src="https://github.com/user-attachments/assets/76fd084b-ae23-4b82-83f3-9074ba57e1ab" />
+## Project Pipeline
 
-<img width="375" alt="quarterly_wind_speed_grid" src="https://github.com/user-attachments/assets/39b3aa4c-3140-41de-94eb-4f79c3b65fb6" />
+### 1. Data Preparation
+**Fire Data Processing** (`fire_grid_analysis.py`)
+- Extracts fire hotspots from NASA FIRMS archives
+- Creates base ignition probability maps
+- Outputs: `fire_frequent_cells_25x25_southeast_us.npy`
 
+**Climate Data Integration** (`final_environmental_factors.py`)
+- Reads `climate.csv` 
+- Normalizes temperature, humidity, and wind data by quarter
+- Generates `.npy` grids for simulation use
 
-<img width="375" alt="elevation_grid" src="https://github.com/user-attachments/assets/e5dc862d-9d6b-4da5-8f6e-9407104a3781" />
+### 2. Environmental Grid Construction
+**Grids Created in `final_environmental_factors.py`:**
+- Temperature – Normalized with seasonal variance
+- Humidity – AR(1) time series modeling
+- Wind – Speed and von Mises-based direction
+- Elevation – Fetched from OpenTopoData API
+- Output: Normalized 25×25 environmental grids for each factor
 
+### 3. Simulation Engine (`wildfire_simulation_simplify.py`)
+**Core Steps:**
+1. Loads all environmental grids and ignition points
+2. Initializes fire spread matrix
+3. Computes fire probability using weighted influence of:
+   - Ignition base rate
+   - Temperature
+   - Humidity
+   - Wind speed/direction
+   - Elevation
+   - Vegetation density
 
-a. Elevation Data- OpenTopography API
-
-b. Other Environmental Variables- NOAA Website (1st Jan 2012 – 1 May 2025) for stations : Imperial Beach, San Diego International Airport, Ramona Airport and Oceanside.
-Simulation Model
-
-
-•	Grid-Based Approach: Utilizes a 25x25 grid representing the study area.
-
-•	Spread Probability: Calculated based on local environmental conditions and neighboring cell states.
-
-•	Time Evolution: Simulates fire spread over discrete time steps, updating environmental conditions dynamically.
-
-• Data Source Website: (all data was requested using the order data feature on these websites)
-
-    1. NOAA - https://www.ncei.noaa.gov/cdo-web/
-    
-    2. NASA FIRMS - https://firms.modaps.eosdis.nasa.gov
-
-    3. Data Link : https://drive.google.com/drive/folders/138FxLgycWRDPRQCPdAqJ7gmZvtycBxvd?usp=sharing (Raw Climate Data and NASA FIRMS data can be found here.)
-
-## Monte Carlo Simulations
-
-•	Parallel Processing: Employs multiprocessing to run multiple simulations concurrently.
-
-•	Convergence Analysis: Uses moving averages and relative change metrics to assess simulation stability.
+**Fire Spread Algorithm:**
+- Accelerated using Numba for efficiency
+- Probability-based cell ignition per time step
+- Monte Carlo runs to test variability and convergence
 
 ## Control Experiment
+The control experiment establishes baseline wildfire spread behavior under standard environmental conditions:
 
-The control experiment establishes the baseline behavior of the wildfire spread simulation under standard environmental conditions. It uses ignition points derived from the NASA FIRMS dataset and generates environmental grids for elevation, wind speed and direction, temperature, humidity, and vegetation ignition probabilities without any modifications related to the tested hypotheses.
-
-The wildfire spread is simulated over a 25 by 25 grid. Spread probabilities are calculated at each time step based on conditions including vegetation type, wind influence, elevation gradient, temperature, and humidity. The simulation proceeds iteratively until convergence is detected based on a relative change threshold in burned area over successive iterations. Convergence is considered achieved when the relative change in burned area remains below 1 percent over the last five time steps.
-
-For the control case, average values are chosen for the environmental conditions. Wind speed, humidity, temperature, and vegetation parameters are sampled from historical distributions and represent average quarterly conditions. 
-
-The control experiment is run for independent Monte Carlo simulations, 1200 runs to ensure statistical stability. The control results provide a reference for the final burned areas, which is later used to evaluate the effects of environmental changes introduced under the hypothesis testing scenarios.
-
-
+- Uses NASA FIRMS-derived ignition points
+- Generates environmental grids without hypothesis modifications
+- Simulates over 25x25 grid with standard conditions
+- Runs 1200 independent Monte Carlo simulations
+- Convergence threshold: the moving average of burned area percentages stabilizes with relative changes below 5% for the last 10 steps
+- Uses average quarterly environmental conditions
 
 ## Hypothesis Testing
 
-Three hypotheses were tested:
+### 1. High Humidity
+**Hypothesis Statement**: Increased atmospheric humidity levels reduce wildfire spread by lowering the probability of ignition and propagation.
 
-1. ### High Humidity
+**Null Hypothesis (H0)**: No significant difference in final burned area between control and high humidity (≥65%) simulations.
 
-Hypothesis Statement: Increased atmospheric humidity levels reduce wildfire spread by lowering the probability of ignition and propagation.
+**Alternative Hypothesis (H1)**: Final burned area is significantly lower in high humidity simulations.
 
-Null Hypothesis (H0): There is no significant difference in the final burned area between the control simulations and the simulations with increased minimum humidity levels (65 percent or higher) across the grid.
+### 2. High Wind Speed
+**Hypothesis Statement**: Higher wind speeds accelerate wildfire spread by increasing ignition probability in neighboring cells.
 
-Alternative Hypothesis (H1): The final burned area is significantly lower in simulations with increased minimum humidity levels (65 percent or higher) compared to the control simulations.
+**Null Hypothesis (H0)**: No significant difference in final burned area between control and tripled wind speed simulations.
 
-2. ### High Wind Speed
+**Alternative Hypothesis (H1)**: Final burned area is significantly higher in high wind speed simulations.
 
-Hypothesis Statement: Higher wind speeds accelerate wildfire spread by increasing the probability of ignition in neighboring cells.
+### 3. Dense Shrub Vegetation
+**Hypothesis Statement**: Higher shrub density increases wildfire ignition likelihood and total spread due to greater fuel availability.
 
-Null Hypothesis (H0): There is no significant difference in the final burned area between the control simulations and the simulations with wind speed values tripled.
+**Null Hypothesis (H0)**: No significant difference in final burned area between control and increased shrub density (2.5x) simulations.
 
-Alternative Hypothesis (H1): The final burned area is significantly higher in simulations with tripled wind speed values compared to the control simulations.
+**Alternative Hypothesis (H1)**: Final burned area is significantly higher in dense shrub vegetation simulations.
 
-3. ### Dense Shrub Vegetation
+## Key Technical Highlights
 
-Hypothesis Statement: Higher shrub density increases wildfire ignition likelihood and total spread due to greater fuel availability.
+### Performance
+- Numba acceleration for critical computation paths
+- Multiprocessing for parallel Monte Carlo simulations
+- Vectorized operations for grid calculations
 
-Null Hypothesis (H0): There is no significant difference in the final burned area between the control simulations and the simulations with increased ignition probabilities for dense shrub vegetation (boosted by a factor of 2.5).
+### Environmental Realism
+- AR(1) time series for weather evolution
+- Von Mises distribution for wind direction
+- Seasonal variation in climate parameters
 
-Alternative Hypothesis (H1): The final burned area is significantly higher in simulations with increased ignition probabilities for dense shrub vegetation compared to the control simulations.
+### Modeling
+- Grid-based probabilistic simulation
+- Weighted environmental factor influence
+- Monte Carlo convergence analysis
 
-Statistical analyses, including t-tests, were conducted to compare the outcomes of these scenarios against the control simulations.
+## Project Execution Flow
 
-## Key Features
+### Step 1: Data Preparation and Analysis
+```bash
+# First, process NASA FIRMS data to identify fire hotspots
+python fire_grid_analysis.py
+# This generates: fire_frequent_cells_25x25_southeast_us.npy
+```
 
-•	Numba Integration: Accelerates computation of spread probabilities through just-in-time compilation.
+### Step 2: Environmental Grid Generation
+```bash
+# Generate all environmental grids (temperature, humidity, wind, elevation)
+python final_environmental_factors.py
+```
 
-•	Parallel Processing: Enhances simulation throughput using Python's multiprocessing capabilities.
+### Step 3: Run Simulations
+```bash
+# Run the main simulation with different hypotheses
+python wildfire_simulations_simplify.py
+# This will:
+# 1. Run control experiment (1200 simulations)
+# 2. Test high humidity hypothesis
+# 3. Test high wind hypothesis
+# 4. Test dense shrub hypothesis
+# 5. Generate comparison plots and statistical analysis
+```
 
-•	Statistical Analysis: Provides quantitative assessment of hypothesis impacts on fire spread.
+## Sample Code Snippets
 
-•	Visualization Tools: Generates plots for burned area over time, convergence behavior, and distribution comparisons.
+### Fire Spread Probability
+```python
+prob = (
+    weights[0] * base +
+    weights[1] * norm_temp +
+    weights[2] * (1 - norm_humidity) +
+    weights[3] * norm_wind_speed +
+    weights[4] * (1 - norm_elevation)
+)
+```
+
+### Weather AR(1) Update
+```python
+new_value = persistence * current_value + variability * random_draw
+```
+
+### Wind Direction Weighting
+```python
+wind_influence = max(0.0, np.cos(np.radians(angle_diff)))
+```
 
 ## Limitations
+1. Grid Resolution: The 25x25 grid may not capture finer-scale fire dynamics
+2. Simplified Assumptions: No long-range ember transport or complex terrain effects
+3. Weather modeled via AR(1), not full spatiotemporal simulation
+4. Fixed vegetation assumptions per grid cell
+5. Hypothesis Impact: Tested hypotheses did not yield statistically significant differences
 
-•	Grid Resolution: The 25x25 grid may not capture finer-scale fire dynamics.
-
-•	Simplified Assumptions: The model does not account for long-range ember transport or complex terrain effects.
-
-•	Hypothesis Impact: The tested hypotheses did not yield statistically significant differences, possibly due to model constraints.
+## Dependencies
+- NumPy
+- Pandas
+- Matplotlib
+- SciPy
+- Numba

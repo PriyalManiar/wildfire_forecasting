@@ -111,7 +111,7 @@ class WildfireSimulation:
         self.weather_persistence = 0.8  # How much weather persists between time steps
         self.weather_variability = 0.2  # How much weather can change between time steps
 
-    def normalize(self, arr:np,ndarray)->np.ndarray:
+    def normalize(self, arr)->np.ndarray:
         """
         Normalise array values between 0 and 1
         :param arr: Input array

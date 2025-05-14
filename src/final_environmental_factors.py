@@ -159,8 +159,11 @@ class EnvironmentalFactors:
         >>> s.shape == (25,25)
         True
 
-        >>> (s>=0).all()
-        np.True_
+        >>> s.shape == (12,12)
+        False
+
+        >>> bool((s>=0).all())
+        True
 
         """
         df = pd.read_csv(csv_path)
@@ -193,6 +196,15 @@ class EnvironmentalFactors:
         :param quarter: Name of the quarter to extract data from.
         :param csv_path: Path to the csv file for climate data
         :return: 2D numpy arrays with humidity values
+
+        >>> e = EnvironmentalFactors()
+        >>> h = e.generate_humidity_grid(quarter='Q1', csv_path='climate.csv')
+        >>> h.shape == (25,25)
+        True
+
+
+        >>> h.shape == (20,20)
+        False
         """
         df = pd.read_csv(csv_path)
         hums = self._get_quarter_data(df, 'DailyAverageRelativeHumidity', quarter)
@@ -223,6 +235,16 @@ class EnvironmentalFactors:
         :param density_factor: Scaling factor for overall ignition probabilities
         :return: 2D numpy arrays with vegetation ignition grid
 
+        >>> e = EnvironmentalFactors()
+        >>> g = e.generate_vegetation_ignition_grid(folder = 'vegetation', hypothesis_dense_shrub=False)
+        >>> g.shape == (25,25)
+        True
+
+        >>> g.shape == (10,10)
+        False
+
+        >>> bool((g>=0).all() and (g<=1).all())
+        True
         """
         npy_file = 'vegetation_ignition_grid_25x25.npy'
         if os.path.exists(npy_file):
@@ -275,6 +297,17 @@ class EnvironmentalFactors:
         :param quarter: Quarter to generate grid for selected quarter.
         :param csv_path: Path to the csv file containing climate data.
         :return: 2D numpy arrays with temperature values
+
+        >>> e = EnvironmentalFactors()
+        >>> t = e.temperature_grid(quarter='Q1', csv_path='climate.csv')
+        >>> t.shape == (25,25)
+        True
+
+        >>> t.shape == (26,26)
+        False
+
+        >>> isinstance(t, np.ndarray)
+        True
         """
         df = pd.read_csv(csv_path)
         vals = self._get_quarter_data(df, 'DailyAverageDryBulbTemperature', quarter)

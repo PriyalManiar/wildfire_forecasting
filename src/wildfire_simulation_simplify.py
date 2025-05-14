@@ -31,6 +31,29 @@ def calculate_spread_probabilities(
     :param weights: Weight for each environmental factor
     :return np.ndarray: spread probabilities for each cell in the grid
 
+
+    >>> grid_size = 3
+    >>> burning_cells = np.zeros((3,3))
+    >>> fire_grid = np.zeros((3,3))
+    >>> ignition_points = np.ones((3,3))
+    >>> vegetation = np.zeros((3,3))
+    >>> norm_temp = np.zeros((3,3))
+    >>> norm_humidity = np.ones((3,3))
+    >>> norm_wind_speed = np.zeros((3,3))
+    >>> norm_elevation = np.zeros((3,3))
+    >>> wind_direction = np.ones((3,3))
+    >>> humidity = np.zeros((3,3))
+    >>> weights = np.zeros(5)
+    >>> s = calculate_spread_probabilities(grid_size, burning_cells, fire_grid, ignition_points, vegetation,norm_temp, norm_humidity, norm_wind_speed, norm_elevation,wind_direction, humidity, weights)
+    >>> s.shape == (3,3)
+    True
+
+    >>> bool((s>=0).all())
+    True
+
+    >>> bool((s<=1).all())
+    True
+
     """
     spread_prob = np.zeros((grid_size, grid_size), dtype=np.float64)
 
@@ -192,14 +215,6 @@ class WildfireSimulation:
                 if len(recent_changes) == k and all(c < self.convergence_threshold for c in recent_changes):
                     break
 
-            # # Check convergence
-            # rel_change = abs(self.burned_areas[-1] - self.burned_areas[-2]) / max(1, self.burned_areas[-2])
-            # recent_changes.append(rel_change)
-            # if len(recent_changes) > k:
-            #     recent_changes.pop(0)
-            # if len(recent_changes) == k and all(c < self.convergence_threshold for c in recent_changes):
-            #     break
-            #
         return self.fire_grid, self.burned_areas
 
     def plot_fire_map(self, path: str='wildfire_spread.png')-> None:
@@ -253,18 +268,37 @@ def moving_average(arr: list[float], window: int)-> np.ndarray:
     :param arr: Input data series
     :param window: Window size for the moving average
     :return: Moving average value for the input data series
+
+    >>> moving_average([1,2,3,4,5], 5)
+    array([3.])
+
+    >>> moving_average([1,1,1,1], 2)
+    array([1., 1., 1.])
     """
     return np.convolve(arr, np.ones(window) / window, mode='valid')
 
 
 def monte_carlo_convergence_check(percentages: list[float], window: int=20, last_n: int=10, threshold: float=0.05)-> tuple[bool,np.ndarray, np.ndarray]:
     """
+    Used Chatgpt for referencing of doctest for this function
     This function checks the Monte Carlo simulation for convergence using relative changes.
     :param percentages: Burned area percentage across the various runs
     :param window: window size for the Monte Carlo simulation moving average
     :param last_n: number of last steps to check for convergence
     :param threshold: convergence threshold value
     :return: moving average and relative changes for the simulation run
+
+    >>> percentages = [12.3,10.4,23.1,13.2,8.5]
+    >>> converged, ma, rel = monte_carlo_convergence_check(percentages)
+
+    >>> isinstance(converged, bool)
+    False
+
+    >>> isinstance(ma, np.ndarray)
+    True
+
+    >>> isinstance(rel, np.ndarray)
+    True
     """
     ma = moving_average(percentages, window)
     rel_changes = np.abs(np.diff(ma) / (ma[:-1] + 1e-8))

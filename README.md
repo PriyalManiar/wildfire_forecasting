@@ -15,7 +15,7 @@ This project simulates wildfire spread over a geographic grid using environmenta
 
 ## Methodology
 
-# Data Preparation
+### Data Preparation
 
 •	Ignition Points: Derived from NASA FIRMS dataset to identify high-frequency fire locations. ( 2012-2025)
 
@@ -42,7 +42,7 @@ Simulation Model
 
 Three hypotheses were tested:
 
-1. # High Humidity
+1. ### High Humidity
 
 Hypothesis Statement: Increased atmospheric humidity levels reduce wildfire spread by lowering the probability of ignition and propagation.
 
@@ -50,7 +50,7 @@ Null Hypothesis (H0): There is no significant difference in the final burned are
 
 Alternative Hypothesis (H1): The final burned area is significantly lower in simulations with increased minimum humidity levels (65 percent or higher) compared to the control simulations.
 
-2. # High Wind Speed
+2. ### High Wind Speed
 
 Hypothesis Statement: Higher wind speeds accelerate wildfire spread by increasing the probability of ignition in neighboring cells.
 
@@ -58,7 +58,7 @@ Null Hypothesis (H0): There is no significant difference in the final burned are
 
 Alternative Hypothesis (H1): The final burned area is significantly higher in simulations with tripled wind speed values compared to the control simulations.
 
-3.# Dense Shrub Vegetation
+3. ### Dense Shrub Vegetation
 
 Hypothesis Statement: Higher shrub density increases wildfire ignition likelihood and total spread due to greater fuel availability.
 

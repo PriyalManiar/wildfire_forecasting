@@ -1,0 +1,5 @@
+Quarter,max_DailyAverageWindSpeed,min_DailyAverageWindSpeed,std_DailyAverageWindSpeed,max_DailyAverageRelativeHumidity,min_DailyAverageRelativeHumidity,std_DailyAverageRelativeHumidity,max_DailyAverageDryBulbTemperature,min_DailyAverageDryBulbTemperature,std_DailyAverageDryBulbTemperature,max_DailyPeakWindDirection,min_DailyPeakWindDirection,std_DailyPeakWindDirection
+Q1,22.4,0.7,2.5839256635609966,95.0,19.0,14.793500886395092,79.0,2.0,7.177168398637548,360.0,10.0,68.01194019677739
+Q2,17.3,2.2,1.658142270279459,93.0,13.0,9.75741714135691,85.0,2.0,6.145308992814918,360.0,10.0,43.73938970221952
+Q3,17.0,1.4,1.2686859014075638,93.0,25.0,6.250024055032698,92.0,59.0,4.300085668509675,360.0,10.0,41.56476658682367
+Q4,27.8,0.0,2.1854204824851102,91.0,19.0,15.272468708455419,86.0,2.0,7.461373617797996,360.0,10.0,67.70487703723694

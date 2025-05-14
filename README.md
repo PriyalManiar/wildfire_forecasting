@@ -1,6 +1,6 @@
 # Enhancing Wildfire Forecasting with Monte Carlo Simulations
 
-## Team Members: Aditi Shukla and Priyal Maniar
+### Team Members: Aditi Shukla and Priyal Maniar
 ## Overview
 This project simulates wildfire spread over a geographic grid(San diego County)using real environmental data and historical fire occurrences data. It aims to model fire dynamics under varying conditions and assess the impact of specific environmental factors through hypothesis testing.
 

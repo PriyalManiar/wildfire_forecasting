@@ -100,6 +100,14 @@ The control experiment establishes baseline wildfire spread behavior under stand
 
 **Alternative Hypothesis (H1)**: Final burned area is significantly lower in high humidity simulations.
 
+**Results**: 
+
+T-statistic = 2.194 | P-value = 0.02833
+
+**Inference**:
+
+A statistically significant difference was detected at the 95% confidence level. Increased humidity led to a measurable change in burned area percentage.
+
 ### 2. High Wind Speed
 **Hypothesis Statement**: Higher wind speeds accelerate wildfire spread by increasing ignition probability in neighboring cells.
 
@@ -107,12 +115,28 @@ The control experiment establishes baseline wildfire spread behavior under stand
 
 **Alternative Hypothesis (H1)**: Final burned area is significantly higher in high wind speed simulations.
 
+**Results**: 
+
+T-statistic = 0.925 | P-value = 0.35527
+
+**Inference**:
+
+No statistically significant difference was detected at the 95% confidence level. Increased wind speed did not result in a statistically meaningful change under the simulation conditions.
+
 ### 3. Dense Shrub Vegetation
 **Hypothesis Statement**: Higher shrub density increases wildfire ignition likelihood and total spread due to greater fuel availability.
 
 **Null Hypothesis (H0)**: No significant difference in final burned area between control and increased shrub density (2.5x) simulations.
 
 **Alternative Hypothesis (H1)**: Final burned area is significantly higher in dense shrub vegetation simulations.
+
+**Results**: 
+
+T-statistic = 2.691 | P-value = 0.00717
+
+**Inference**:
+
+A statistically significant difference was detected at the 95% confidence level. Denser vegetation significantly increased the burned area percentage.
 
 ## Key Technical Highlights
 

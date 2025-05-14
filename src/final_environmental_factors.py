@@ -50,20 +50,39 @@ class EnvironmentalFactors:
 
     def _select_random_quarter(self)-> str:
         """
+        reference : used chatgpt to get startswith for doctest
         Randomly selects one of the 4 quarters : Q1, Q2, Q3, Q4
 
         :return: A string representing the randomly selected quarter.
+
+        >>> e = EnvironmentalFactors()
+        >>> e._select_random_quarter() in ['Q1', 'Q2', 'Q3', 'Q4']
+        True
+
+        >>> e = EnvironmentalFactors()
+        >>> all(e._select_random_quarter().startswith('Q') for _ in range(4))
+        True
+
         """
         return f'Q{np.random.randint(1, 5)}'
 
     def _get_quarter_data(self, df: pd.DataFrame, column:str, quarter:str)->np.ndarray:
         """
+        reference : used chatgpt to get isintance for doctest
         Extract numeric values for a given quarter from a DataFrame.
 
         :param df: Pandas DataFrame containing the data.
         :param column: Name of the column to extract data from.
         :param quarter: Name of the quarter to extract data from.
         :return: Numpy array of numeric quarter values
+
+        >>> df = pd.DataFrame({'Quarter': ['Q1','Q2','Q3','Q4'],'Values': ['10','20','30','40']})
+        >>> e = EnvironmentalFactors()
+        >>> e._get_quarter_data(df, 'Values', 'Q1')
+        array([10])
+
+        >>> isinstance(e._get_quarter_data(df, 'Values', 'Q2'), np.ndarray)
+        True
 
         """
         # Select rows matching the quarter
@@ -128,11 +147,20 @@ class EnvironmentalFactors:
 
     def generate_wind_grids(self, quarter:str, csv_path:str='climate.csv')-> tuple[np.ndarray, np.ndarray]:
         """
+        Reference : used chatgpt for 2nd doctest
         Create wind speed and direction grids for the selected quarter.
 
         :param quarter: Name of the quarter to extract data from.
         :param csv_path: Path to the csv file.
         :return: Tuple 2 numpy arrays : wind speed grid (in m/s) and wind direction grid (in degrees)
+
+        >>> e = EnvironmentalFactors()
+        >>> s,d = e.generate_wind_grids(quarter='Q1', csv_path='climate.csv')
+        >>> s.shape == (25,25)
+        True
+
+        >>> (s>=0).all()
+        np.True_
 
         """
         df = pd.read_csv(csv_path)
